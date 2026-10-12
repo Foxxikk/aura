@@ -20,6 +20,7 @@ export async function POST(req: Request) {
     email: String(a.email ?? "").slice(0, 200), country: String(a.country ?? "").slice(0, 80),
     concept: String(a.concept ?? "").slice(0, 2000), categories: Array.isArray(a.categories) ? a.categories.slice(0, 8).map(String) : [],
     submittedAt: new Date().toISOString().slice(0, 10), kyc: "pending", status: "pending",
+    card: a.card && typeof a.card === "object" && JSON.stringify(a.card).length < 6000 ? a.card : undefined,
   };
   await sql!`INSERT INTO applications (id, data, status) VALUES (${id}, ${JSON.stringify(data)}::jsonb, 'pending')`;
   return Response.json({ ok: true, id });

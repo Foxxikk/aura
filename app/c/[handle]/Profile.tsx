@@ -11,6 +11,7 @@ import { StoryAvatar, StoryViewer } from "@/components/Stories";
 import TipGoal from "@/components/TipGoal";
 import EventBanner from "@/components/EventBanner";
 import ReportButton from "@/components/ReportButton";
+import SimilarPersonas from "@/components/SimilarPersonas";
 import { useT } from "@/lib/i18n";
 import { personaText } from "@/lib/data";
 import { finalPrice, loyalty } from "@/lib/loyalty";
@@ -182,10 +183,12 @@ export default function Profile({ handle }: { handle: string }) {
             ))}
             <TipGoal personaId={p.id} />
             <p className="px-1 text-xs text-muted">{t("profile.note", { studio: p.creatorStudio })}</p>
+            <Link href={`/gift?persona=${p.handle}`} className="btn-ghost w-full">🎁 {t("gift.giveSub")}</Link>
             <ReportButton target="persona" targetId={p.id} personaId={p.id} excerpt={p.name} label={`⚑ ${t("profile.report")}`} className="px-1" />
           </aside>
         </div>
       </div>
+      <SimilarPersonas id={p.id} />
       {storyOpen && <StoryViewer personaId={p.id} onClose={() => setStoryOpen(false)} />}
     </div>
   );

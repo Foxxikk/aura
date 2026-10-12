@@ -78,7 +78,7 @@ export default function Chat({ handle }: { handle: string }) {
         lang,
         tier: sub,
         history: history.map(({ from, text }) => ({ from, text })),
-        memory: mem,
+        memory: store.consents.aiMemory ? mem : undefined,
         offers: { ppv: offers.ppv, bundles: offers.bundles.map((b) => ({ id: b.id, title: b.title, price: bundlePrice(b, currentEvent.bundleDiscount).price })) },
       }),
     }).then((r) => r.json());
@@ -105,7 +105,7 @@ export default function Chat({ handle }: { handle: string }) {
     });
     set((s) => {
       const cur = s.memory[p.id] ?? { facts: [] };
-      const memo = res.memo as { name?: string; facts?: string[] } | undefined;
+      const memo = s.consents.aiMemory ? (res.memo as { name?: string; facts?: string[] } | undefined) : undefined;
       return {
         scheduled: [...s.scheduled, ...items],
         memory: memo

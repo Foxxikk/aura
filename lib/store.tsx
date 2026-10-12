@@ -78,6 +78,23 @@ export type Report = {
 
 export type StudioMember = { id: string; email: string; role: "owner" | "editor" | "operator" | "accountant"; invitedAt: number; accepted: boolean };
 
+export type Gift = {
+  code: string;
+  kind: "sub" | "card";
+  personaId?: string;
+  tier?: string;
+  months?: number;
+  amount?: number;
+  to?: string;
+  message?: string;
+  createdAt: number;
+  redeemed?: boolean;
+};
+
+export type Collection = { id: string; name: string; postIds: string[] };
+
+export type Consents = { personalization: boolean; aiMemory: boolean; marketing: boolean; analytics: boolean };
+
 export type State = {
   ageVerified: boolean;
   balance: number;
@@ -115,6 +132,15 @@ export type State = {
   creatorPersonaId: string;
   creatorRole: StudioMember["role"];
   notificationsEnabled: boolean;
+  storyProgress: Record<string, string[]>;
+  storyUnlocked: string[];
+  seasonVotes: Record<string, number>;
+  saved: string[];
+  collections: Collection[];
+  giftsSent: Gift[];
+  giftsRedeemed: string[];
+  consents: Consents;
+  copilotSent: Record<string, number>;
 };
 
 const initial: State = {
@@ -157,6 +183,15 @@ const initial: State = {
   creatorPersonaId: "p1",
   creatorRole: "owner",
   notificationsEnabled: false,
+  storyProgress: {},
+  storyUnlocked: [],
+  seasonVotes: {},
+  saved: [],
+  collections: [],
+  giftsSent: [],
+  giftsRedeemed: [],
+  consents: { personalization: true, aiMemory: true, marketing: false, analytics: true },
+  copilotSent: {},
 };
 
 const KEY = "aura-state-v2";

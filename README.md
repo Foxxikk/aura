@@ -36,6 +36,17 @@ Kurátorská předplatitelská platforma 18+, kde schválení tvůrci provozují
 - **Studio účty** – víc person v jednom studiu, tým s rolemi a oprávněními, výplaty podle persony
 - **Jazykové verze** – čeština, angličtina, němčina pro fanouškovskou část; AI odpovídá v jazyce fanouška
 
+### Iterace 4
+
+- **Interaktivní příběhy** – větvené příběhy s volbami, první kapitola zdarma, další placené (`/stories`)
+- **Sezóny** – epizody na pokračování, fanoušci hlasují o dalším ději
+- **Co-pilot inbox** – konverzace studia, návrh odpovědi od AI, schválení a odeslání, režim schvalování / autopilot
+- **Průvodce pro tvůrce** – 5 kroků od konceptu po odeslání, návrh karty persony pomocí AI, odhad příjmu (`/creator/onboarding`)
+- **Dárky** – dárkové předplatné a karty s kódem `AURA-XXXX-XXXX`, uplatnění i z jiného účtu (s DB) (`/gift`)
+- **Uložené a sbírky** – záložky, vlastní sbírky, podobné persony na profilu (`/saved`)
+- **Centrum soukromí** – souhlasy (personalizace, paměť AI, marketing), export dat, mazání paměti, chatů i účtu (`/privacy`)
+- **Admin přehled** – uživatelé, obrat, příjem platformy, trychtýř, tržby podle persony, moderace
+
 ### Web push
 
 Pro upozornění i při zavřené aplikaci vygeneruj klíče (`npx web-push generate-vapid-keys`) a nastav ve Vercelu `NEXT_PUBLIC_VAPID_PUBLIC_KEY` a `VAPID_PRIVATE_KEY`.

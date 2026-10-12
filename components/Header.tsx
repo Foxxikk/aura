@@ -21,6 +21,7 @@ export default function Header() {
   const nav = [
     { href: "/feed", label: t("nav.feed") },
     { href: "/explore", label: t("nav.explore") },
+    { href: "/stories", label: t("nav.stories") },
     { href: "/live", label: t("nav.live") },
     { href: "/messages", label: t("nav.messages") },
     { href: "/rewards", label: t("nav.rewards") },
@@ -56,6 +57,7 @@ export default function Header() {
               <span style={{ color: lvl.level.color }}>◆</span> {lvl.level.name[lang]}
             </Link>
           )}
+          <Link href="/saved" className="chip hidden text-ink sm:inline-flex" title={t("nav.saved")}>★</Link>
           <Link href="/wallet" className="chip text-ink">
             <span className="text-gold">●</span> {ready ? balance.toFixed(2) : "–"} €
           </Link>
@@ -77,6 +79,7 @@ export default function Header() {
           </Link>
         ))}
         <Link href="/wallet" className={`shrink-0 rounded-full px-3 py-1 text-xs ${path.startsWith("/wallet") ? "bg-surface-2" : "text-muted"}`}>{t("nav.wallet")}</Link>
+        <Link href="/saved" className={`shrink-0 rounded-full px-3 py-1 text-xs ${path.startsWith("/saved") ? "bg-surface-2" : "text-muted"}`}>{t("nav.saved")}</Link>
       </nav>
     </header>
   );

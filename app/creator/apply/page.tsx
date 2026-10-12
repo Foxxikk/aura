@@ -28,6 +28,7 @@ export default function Apply() {
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="font-display text-5xl">Staň se tvůrcem</h1>
+      <a href="/creator/onboarding" className="mt-4 block rounded-xl border border-gold/40 bg-gold/10 p-4 text-sm text-gold">✨ Nově: průvodce založením persony s návrhem karty pomocí AI →</a>
       <p className="mt-2 text-muted">Aura je kurátorská platforma – každé studio a personu schvalujeme ručně. Získáš hosting, platby, AI chat v charakteru persony a 80 % z příjmů.</p>
       <form
         className="card mt-8 space-y-4 p-6"

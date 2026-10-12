@@ -19,9 +19,9 @@ function useCreator() {
 type Role = "owner" | "editor" | "operator" | "accountant";
 const roleLabel: Record<Role, string> = { owner: "Vlastník", editor: "Editor obsahu", operator: "Chat operátor", accountant: "Účetní" };
 const roleTabs: Record<Role, string[]> = {
-  owner: ["overview", "broadcast", "vault", "requests", "persona", "team", "payouts"],
+  owner: ["overview", "inbox", "broadcast", "vault", "requests", "persona", "team", "payouts"],
   editor: ["vault", "requests", "persona"],
-  operator: ["broadcast", "requests"],
+  operator: ["inbox", "broadcast", "requests"],
   accountant: ["overview", "payouts"],
 };
 
@@ -48,7 +48,7 @@ const segments: { id: Segment; label: string; share: number; hint: string }[] = 
   { id: "no_ppv", label: "Ještě nekoupili PPV", share: 0.41, hint: "první nákup" },
 ];
 
-type Tab = "overview" | "broadcast" | "vault" | "requests" | "persona" | "team" | "payouts";
+type Tab = "overview" | "inbox" | "broadcast" | "vault" | "requests" | "persona" | "team" | "payouts";
 
 export default function Creator() {
   const store = useStore();
@@ -75,16 +75,18 @@ export default function Creator() {
             {(Object.keys(roleLabel) as Role[]).map((r) => <option key={r} value={r}>{roleLabel[r]}</option>)}
           </select>
         </label>
+        <Link href="/creator/onboarding" className="btn-ghost">+ Nová persona</Link>
         <Link href={`/c/${persona.handle}`} className="btn-ghost">Zobrazit profil</Link>
       </div>
 
       <div className="mt-6 flex gap-2 overflow-x-auto border-b border-line">
-        {([["overview", "Statistiky"], ["broadcast", "Hromadné zprávy"], ["vault", "Vault a balíčky"], ["requests", `Na přání${pendingReq ? ` (${pendingReq})` : ""}`], ["persona", "Persona a chat"], ["team", "Tým"], ["payouts", "Výplaty"]] as const).filter(([k]) => allowed.includes(k)).map(([k, l]) => (
+        {([["overview", "Statistiky"], ["inbox", "Co-pilot inbox"], ["broadcast", "Hromadné zprávy"], ["vault", "Vault a balíčky"], ["requests", `Na přání${pendingReq ? ` (${pendingReq})` : ""}`], ["persona", "Persona a chat"], ["team", "Tým"], ["payouts", "Výplaty"]] as const).filter(([k]) => allowed.includes(k)).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} className={`-mb-px shrink-0 border-b-2 px-4 py-2 text-sm ${tab === k ? "border-gold" : "border-transparent text-muted"}`}>{l}</button>
         ))}
       </div>
 
       {tab === "overview" && <Overview />}
+      {tab === "inbox" && <Inbox />}
       {tab === "broadcast" && <Broadcasts />}
       {tab === "vault" && <Vault />}
       {tab === "requests" && <Requests />}
@@ -617,6 +619,107 @@ function Payouts() {
         </ul>
         <p className="mt-3 text-[11px] text-muted">Ilustrační data. V produkci výplaty přes platební bránu s fakturou a vyúčtováním DPH.</p>
       </div>
+    </div>
+  );
+}
+
+/* ---------------- Co-pilot inbox ---------------- */
+
+type Thread = { id: string; fan: string; real: boolean; vip: boolean; spent: number; msgs: { from: "fan" | "persona"; text: string }[] };
+
+const demoThreads = (personaName: string): Thread[] => [
+  { id: "d1", fan: "marek_88", real: false, vip: true, spent: 1240, msgs: [{ from: "persona", text: "dobré ráno ☀️ jak ses vyspal?" }, { from: "fan", text: "skvěle, dneska jedu na hory. co ty?" }] },
+  { id: "d2", fan: "jiri.k", real: false, vip: false, spent: 865, msgs: [{ from: "fan", text: `${personaName.split(" ")[0]}, ten poslední set byl nádherný. bude pokračování?` }] },
+  { id: "d3", fan: "tomas.v", real: false, vip: false, spent: 390, msgs: [{ from: "fan", text: "ahoj, jsem tu nový 👋" }] },
+];
+
+function Inbox() {
+  const { persona } = useCreator();
+  const store = useStore();
+  const { chats, subscriptions, transactions, set, memory, copilotSent } = store;
+  const realMsgs = (chats[persona.id] ?? []).filter((m) => m.from !== "system" && m.text);
+  const threads: Thread[] = [
+    ...(realMsgs.length ? [{ id: "real", fan: "Ty (demo účet)", real: true, vip: subscriptions[persona.id] === "vip", spent: transactions.filter((t) => t.personaId === persona.id && t.amount < 0).reduce((a, t) => a - t.amount, 0), msgs: realMsgs.slice(-8).map((m) => ({ from: m.from as "fan" | "persona", text: m.text })) }] : []),
+    ...demoThreads(persona.name),
+  ];
+  const [activeId, setActiveId] = useState(threads[0]?.id);
+  const [local, setLocal] = useState<Record<string, { from: "fan" | "persona"; text: string }[]>>({});
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<Record<string, "approve" | "auto">>({});
+  const active = threads.find((t) => t.id === activeId) ?? threads[0];
+  const msgs = active ? [...active.msgs, ...(local[active.id] ?? [])] : [];
+  const waiting = (t: Thread) => { const all = [...t.msgs, ...(local[t.id] ?? [])]; return all[all.length - 1]?.from === "fan"; };
+
+  async function suggest() {
+    if (!active) return;
+    setBusy(true);
+    const res = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ personaId: persona.id, history: msgs, memory: active.real ? memory[persona.id] : undefined, tier: active.vip ? "vip" : "fan" }) }).then((r) => r.json()).catch(() => ({ replies: [] }));
+    setDraft((res.replies ?? []).join("\n\n"));
+    setBusy(false);
+  }
+
+  function send() {
+    if (!active || !draft.trim()) return;
+    const text = draft.trim();
+    if (active.real) {
+      const parts = text.split(/\n\s*\n/).filter(Boolean);
+      let at = Date.now() + 800;
+      set((s) => ({
+        scheduled: [...s.scheduled, ...parts.map((p) => { const typingFrom = at; at += 1500 + p.length * 30; return { id: crypto.randomUUID(), personaId: persona.id, readAt: Date.now(), typingFrom, deliverAt: at, msg: { id: crypto.randomUUID(), from: "persona" as const, text: p, at } }; })],
+        copilotSent: { ...s.copilotSent, [persona.id]: (s.copilotSent[persona.id] ?? 0) + 1 },
+      }));
+    } else {
+      setLocal((l) => ({ ...l, [active.id]: [...(l[active.id] ?? []), { from: "persona", text }] }));
+      set((s) => ({ copilotSent: { ...s.copilotSent, [persona.id]: (s.copilotSent[persona.id] ?? 0) + 1 } }));
+    }
+    setDraft("");
+  }
+
+  return (
+    <div className="mt-6 grid gap-4 lg:grid-cols-[280px_1fr]">
+      <div className="card divide-y divide-line overflow-hidden">
+        <div className="p-3 text-xs text-muted">Konverzace {persona.name} · schváleno {copilotSent[persona.id] ?? 0} odpovědí</div>
+        {threads.map((t) => (
+          <button key={t.id} onClick={() => { setActiveId(t.id); setDraft(""); }} className={`block w-full p-3 text-left text-sm ${active?.id === t.id ? "bg-surface-2" : ""}`}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium">{t.fan}</span>
+              <span className="flex gap-1">{t.vip && <span className="chip px-2 py-0 text-[10px] text-gold">VIP</span>}{waiting(t) && <span className="h-2 w-2 rounded-full bg-rose" />}</span>
+            </div>
+            <p className="truncate text-xs text-muted">{[...t.msgs, ...(local[t.id] ?? [])].slice(-1)[0]?.text}</p>
+            <p className="text-[10px] text-muted">LTV {Math.round(t.spent)} €{t.real ? " · skutečný chat" : " · ukázka"}</p>
+          </button>
+        ))}
+      </div>
+      {active && (
+        <div className="card flex min-h-[480px] flex-col">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
+            <p className="font-semibold">{active.fan}</p>
+            <div className="flex gap-1 text-xs">
+              {(["approve", "auto"] as const).map((m) => (
+                <button key={m} onClick={() => setMode((x) => ({ ...x, [active.id]: m }))} className={`chip ${ (mode[active.id] ?? (active.vip ? "approve" : "auto")) === m ? "border-gold text-gold" : ""}`}>
+                  {m === "approve" ? "Schvalovat odpovědi" : "AI odpovídá sama"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex-1 space-y-2 overflow-y-auto p-4">
+            {msgs.map((m, i) => (
+              <div key={i} className={`flex ${m.from === "fan" ? "justify-start" : "justify-end"}`}>
+                <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${m.from === "fan" ? "bg-surface-2" : "bg-gold/15"}`}>{m.text}</div>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-2 border-t border-line p-3">
+            <textarea className="input min-h-20" placeholder="Napiš odpověď za personu, nebo si nech navrhnout…" value={draft} onChange={(e) => setDraft(e.target.value)} />
+            <div className="flex flex-wrap justify-between gap-2">
+              <button className="btn-ghost" onClick={suggest} disabled={busy}>{busy ? "Navrhuji…" : "✨ Návrh AI"}</button>
+              <button className="btn-primary" onClick={send} disabled={!draft.trim()}>Schválit a odeslat</button>
+            </div>
+            <p className="text-[11px] text-muted">Odpověď odejde jako zpráva persony; fanoušek dál vidí štítek AI persona. Režim „AI odpovídá sama“ je výchozí pro běžné fanoušky, VIP mají schvalování.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

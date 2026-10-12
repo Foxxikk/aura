@@ -9,7 +9,8 @@ import ReportButton from "./ReportButton";
 
 export default function PostCard({ post, persona, reason }: { post: Post; persona: Persona; reason?: string }) {
   const store = useStore();
-  const { subscriptions, unlocked, spend, set, likes, hiddenPosts } = store;
+  const { subscriptions, unlocked, spend, set, likes, hiddenPosts, saved } = store;
+  const isSaved = saved.includes(post.id);
   const t = useT();
   const subscribed = !!subscriptions[persona.id];
   const isVip = subscriptions[persona.id] === "vip";
@@ -52,12 +53,22 @@ export default function PostCard({ post, persona, reason }: { post: Post; person
           <p className="truncate text-sm font-medium">{post.caption}</p>
           <p className="text-xs text-muted">{t("post.daysAgo", { n: post.daysAgo })}{reason ? ` · ${reason}` : ""}</p>
         </div>
+        <div className="flex shrink-0 items-center gap-3">
+        <button
+          onClick={() => set((s) => ({ saved: isSaved ? s.saved.filter((x) => x !== post.id) : [...s.saved, post.id] }))}
+          className={`shrink-0 text-sm ${isSaved ? "text-gold" : "text-muted"}`}
+          aria-label={t("nav.saved")}
+          title={t("nav.saved")}
+        >
+          {isSaved ? "★" : "☆"}
+        </button>
         <button
           onClick={() => set((s) => ({ likes: liked ? s.likes.filter((l) => l !== post.id) : [...s.likes, post.id] }))}
           className={`shrink-0 text-sm ${liked ? "text-rose" : "text-muted"}`}
         >
           {liked ? "♥" : "♡"} {post.likes + (liked ? 1 : 0)}
         </button>
+        </div>
       </div>
     </article>
   );

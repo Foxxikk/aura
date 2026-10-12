@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ModerationQueue from "@/components/ModerationQueue";
 import PushSender from "@/components/PushSender";
+import AdminOverview from "@/components/AdminOverview";
 import type { Application } from "@/lib/data";
 import { useStore } from "@/lib/store";
 
@@ -19,7 +20,7 @@ export default function Admin() {
   const openReports = reports.filter((r) => r.status === "open").length;
   const [filter, setFilter] = useState<Application["status"] | "all">("pending");
   const [remote, setRemote] = useState<Application[] | null>(null);
-  const [section, setSection] = useState<"apps" | "moderation" | "push">("apps");
+  const [section, setSection] = useState<"overview" | "apps" | "moderation" | "push">("overview");
   const live = dbEnabled && user?.role === "admin";
 
   const load = useCallback(async () => {
@@ -72,7 +73,7 @@ export default function Admin() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-wider text-muted">Administrace</p>
-          <h1 className="font-display text-5xl">{section === "apps" ? "Schvalování tvůrců" : section === "moderation" ? "Moderace" : "Notifikace"}</h1>
+          <h1 className="font-display text-5xl">{section === "overview" ? "Přehled platformy" : section === "apps" ? "Schvalování tvůrců" : section === "moderation" ? "Moderace" : "Notifikace"}</h1>
         </div>
         {section === "apps" && <div className="flex flex-wrap gap-2">
           {(["pending", "approved", "rejected", "suspended", "all"] as const).map((s) => (
@@ -84,11 +85,12 @@ export default function Admin() {
       </div>
 
       <div className="mt-4 flex gap-2 border-b border-line">
-        {([["apps", "Žádosti tvůrců"], ["moderation", `Moderace${openReports ? ` (${openReports})` : ""}`], ["push", "Notifikace"]] as const).map(([k, l]) => (
+        {([["overview", "Přehled"], ["apps", "Žádosti tvůrců"], ["moderation", `Moderace${openReports ? ` (${openReports})` : ""}`], ["push", "Notifikace"]] as const).map(([k, l]) => (
           <button key={k} onClick={() => setSection(k)} className={`-mb-px border-b-2 px-4 py-2 text-sm ${section === k ? "border-gold" : "border-transparent text-muted"}`}>{l}</button>
         ))}
       </div>
 
+      {section === "overview" && <div className="mt-6"><AdminOverview live={live} /></div>}
       {section === "moderation" && <div className="mt-6"><ModerationQueue live={live} /></div>}
       {section === "push" && <div className="mt-6"><PushSender live={live} /></div>}
 

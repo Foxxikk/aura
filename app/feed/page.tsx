@@ -53,7 +53,9 @@ export default function Feed() {
   }, [subscriptions, chats, likes, transactions, unlocked, suspendedPersonas, hiddenPosts, lang]);
 
   if (!ready) return null;
-  const list = tab === "following" ? scored.filter((s) => subscriptions[s.persona.id]).sort((a, b) => a.post.daysAgo - b.post.daysAgo) : scored;
+  const personalized = store.consents.personalization;
+  const base = personalized ? scored : [...scored].sort((a, b) => a.post.daysAgo - b.post.daysAgo).map((x) => ({ ...x, why: "" }));
+  const list = tab === "following" ? scored.filter((s) => subscriptions[s.persona.id]).sort((a, b) => a.post.daysAgo - b.post.daysAgo) : base;
   const suggested = personas.filter((p) => !subscriptions[p.id] && !suspendedPersonas.includes(p.id)).slice(0, 3);
 
   return (
