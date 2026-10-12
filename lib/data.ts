@@ -19,7 +19,7 @@ export type Offer = {
   title: string;
   description: string;
   price: number;
-  type: "bundle" | "custom" | "discount";
+  type: "custom" | "discount";
 };
 
 export type Persona = {
@@ -223,18 +223,10 @@ export const posts: Post[] = personas.flatMap((p) =>
 
 export const offers: Offer[] = personas.flatMap((p) => [
   {
-    id: `${p.id}-o1`,
-    personaId: p.id,
-    title: "Balíček týdne",
-    description: "3 exkluzivní sety, které nejsou ve feedu.",
-    price: 19,
-    type: "bundle" as const,
-  },
-  {
     id: `${p.id}-o2`,
     personaId: p.id,
     title: "Custom set na přání",
-    description: "Napiš téma a styl, tvůrce připraví set do 72 hodin.",
+    description: "Napiš téma a styl, tvůrce připraví set do 72 hodin. Platíš 50 % předem, zbytek při doručení.",
     price: 45,
     type: "custom" as const,
   },
@@ -247,6 +239,73 @@ export const offers: Offer[] = personas.flatMap((p) => [
     type: "discount" as const,
   },
 ]);
+
+export type Bundle = {
+  id: string;
+  personaId: string;
+  title: string;
+  postIds: string[];
+  discount: number; // v procentech
+  createdAt?: number;
+};
+
+/** Výchozí balíčky; tvůrce si další skládá ve vaultu. */
+export const seedBundles: Bundle[] = personas.map((p) => {
+  const ids = posts.filter((x) => x.personaId === p.id && x.access !== "free").map((x) => x.id);
+  return { id: `${p.id}-b1`, personaId: p.id, title: "Balíček týdne", postIds: ids.slice(0, 3), discount: 25 };
+});
+
+export function bundlePrice(b: Bundle, eventDiscount = 0) {
+  const full = b.postIds.reduce((sum, id) => {
+    const post = posts.find((x) => x.id === id);
+    return sum + (post?.price ?? 8);
+  }, 0);
+  const price = full * (1 - b.discount / 100) * (1 - eventDiscount / 100);
+  return { full, price: Math.round(price * 100) / 100 };
+}
+
+export type Story = {
+  id: string;
+  personaId: string;
+  caption: string;
+  hue: number;
+  hoursAgo: number;
+  subscribersOnly: boolean;
+};
+
+const storyCaptions = ["Dobré ráno odsud ☀️", "Co dneska dělám", "Zákulisí focení", "Večerní nálada", "Hádej, kde jsem"];
+
+export const stories: Story[] = personas.flatMap((p, pi) =>
+  Array.from({ length: 2 + (pi % 2) }, (_, i) => ({
+    id: `${p.id}-s${i}`,
+    personaId: p.id,
+    caption: storyCaptions[(pi + i) % storyCaptions.length],
+    hue: (p.hue + i * 50 + 20) % 360,
+    hoursAgo: 1 + i * 5 + pi,
+    subscribersOnly: i === 1,
+  }))
+);
+
+export type TipGoal = { personaId: string; title: string; target: number; raisedBase: number; reward: string };
+
+export const tipGoals: TipGoal[] = personas.map((p, i) => ({
+  personaId: p.id,
+  title: ["Nové focení u moře", "Cosplay na Comic-Con", "Plánovaná túra v Dolomitech", "Editorial v Paříži", "Výlet do Portugalska", "Koncert v Montmartru"][i],
+  target: 500 + i * 100,
+  raisedBase: 260 + i * 55,
+  reward: "Při splnění dostanou všichni přispěvatelé exkluzivní set zdarma.",
+}));
+
+export type PlatformEvent = { id: string; title: string; description: string; bundleDiscount: number; endsInHours: number };
+
+/** Aktuální sezónní akce platformy – sleva se přičítá k bundlům. */
+export const currentEvent: PlatformEvent = {
+  id: "autumn-2026",
+  title: "Podzimní víkend",
+  description: "Extra −20 % na všechny balíčky u všech person.",
+  bundleDiscount: 20,
+  endsInHours: 54,
+};
 
 export type Application = {
   id: string;

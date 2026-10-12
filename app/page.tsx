@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { personas } from "@/lib/data";
 import PersonaCard from "@/components/PersonaCard";
+import { StoriesRow } from "@/components/Stories";
+import EventBanner from "@/components/EventBanner";
 
 export default function Home() {
   const featured = [...personas].sort((a, b) => b.subscribers - a.subscribers).slice(0, 3);
   return (
-    <div className="space-y-16">
+    <div className="space-y-12">
+      <StoriesRow />
       <section className="grain relative overflow-hidden rounded-3xl border border-line px-6 py-16 sm:px-12 sm:py-24"
         style={{ background: "radial-gradient(ellipse at 15% 20%, #6b2a45 0%, transparent 55%), radial-gradient(ellipse at 90% 80%, #7a4a2c 0%, transparent 50%), #140f13" }}>
         <span className="ai-badge">Kurátorský výběr AI tvůrců</span>
@@ -21,6 +24,8 @@ export default function Home() {
           <Link href="/creator/apply" className="btn-ghost">Staň se tvůrcem</Link>
         </div>
       </section>
+
+      <EventBanner />
 
       <section>
         <div className="mb-5 flex items-end justify-between">

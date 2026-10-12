@@ -14,7 +14,7 @@ const nav = [
 
 export default function Header() {
   const path = usePathname();
-  const { balance, ready } = useStore();
+  const { balance, ready, user, syncState } = useStore();
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4 sm:px-6">
@@ -36,6 +36,17 @@ export default function Header() {
         </nav>
         <Link href="/wallet" className="ml-auto chip text-ink md:ml-0">
           <span className="text-gold">●</span> {ready ? balance.toFixed(2) : "–"} €
+        </Link>
+        <Link href="/login" className="chip text-ink" title={user ? (syncState === "synced" ? "Uloženo v databázi" : syncState === "saving" ? "Ukládám…" : "Chyba synchronizace") : "Demo režim – data jen v tomto prohlížeči"}>
+          {user ? (
+            <>
+              <span className={syncState === "error" ? "text-rose" : "text-ok"}>●</span>
+              <span className="hidden max-w-28 truncate sm:inline">{user.email}</span>
+              <span className="sm:hidden">Účet</span>
+            </>
+          ) : (
+            "Přihlásit"
+          )}
         </Link>
       </div>
       <nav className="flex gap-1 overflow-x-auto px-4 pb-2 md:hidden">

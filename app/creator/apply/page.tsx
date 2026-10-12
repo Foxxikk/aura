@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useStore } from "@/lib/store";
 
 export default function Apply() {
-  const { set } = useStore();
+  const { set, dbEnabled } = useStore();
   const [done, setDone] = useState(false);
   const [f, setF] = useState({ studio: "", personaName: "", email: "", country: "", concept: "", categories: "" });
   const [checks, setChecks] = useState([false, false, false, false]);
@@ -31,8 +31,13 @@ export default function Apply() {
       <p className="mt-2 text-muted">Aura je kurátorská platforma – každé studio a personu schvalujeme ručně. Získáš hosting, platby, AI chat v charakteru persony a 80 % z příjmů.</p>
       <form
         className="card mt-8 space-y-4 p-6"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
+          if (dbEnabled) {
+            const r = await fetch("/api/applications", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...f, categories: f.categories.split(",").map((c) => c.trim()).filter(Boolean) }) });
+            if (!r.ok) return alert("Odeslání se nezdařilo, zkus to prosím znovu.");
+            return setDone(true);
+          }
           set((s) => ({
             applications: [
               {

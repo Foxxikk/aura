@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import type { Application } from "@/lib/data";
 import { useStore } from "@/lib/store";
 
@@ -12,17 +13,51 @@ const statusLabel: Record<Application["status"], string> = {
 };
 
 export default function Admin() {
-  const { applications, set, ready } = useStore();
+  const { applications: localApps, set, ready, dbEnabled, user } = useStore();
   const [filter, setFilter] = useState<Application["status"] | "all">("pending");
-  if (!ready) return null;
+  const [remote, setRemote] = useState<Application[] | null>(null);
+  const live = dbEnabled && user?.role === "admin";
 
-  function update(id: string, status: Application["status"]) {
+  const load = useCallback(async () => {
+    const r = await fetch("/api/applications");
+    if (r.ok) setRemote((await r.json()).applications);
+  }, []);
+  useEffect(() => {
+    if (live) load();
+  }, [live, load]);
+
+  if (!ready) return null;
+  if (dbEnabled && user?.role !== "admin") {
+    return (
+      <div className="card mx-auto mt-10 max-w-md p-8 text-center">
+        <h1 className="font-display text-4xl">Administrace</h1>
+        <p className="mt-2 text-sm text-muted">Přístup jen pro administrátory. Přihlas se účtem, jehož e-mail je v proměnné ADMIN_EMAILS.</p>
+        <Link href="/login" className="btn-primary mt-6">Přihlásit se</Link>
+      </div>
+    );
+  }
+  const applications = live ? remote ?? [] : localApps;
+
+  async function update(id: string, status: Application["status"]) {
     let note: string | undefined;
     if (status === "rejected" || status === "suspended") {
       note = prompt("Důvod (uvidí ho tvůrce):") ?? undefined;
       if (note === undefined) return;
     }
+    if (live) {
+      await fetch("/api/applications", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, status, note }) });
+      return load();
+    }
     set((s) => ({ applications: s.applications.map((a) => (a.id === id ? { ...a, status, note } : a)) }));
+  }
+
+  async function verifyKyc(id: string) {
+    if (live) {
+      const a = applications.find((x) => x.id === id)!;
+      await fetch("/api/applications", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, status: a.status, kyc: "verified" }) });
+      return load();
+    }
+    set((s) => ({ applications: s.applications.map((a) => (a.id === id ? { ...a, kyc: "verified" } : a)) }));
   }
 
   const list = applications.filter((a) => filter === "all" || a.status === filter);
@@ -56,6 +91,7 @@ export default function Admin() {
                   <span className={`chip ${a.kyc === "verified" ? "border-ok/40 text-ok" : "border-gold/40 text-gold"}`}>
                     KYC {a.kyc === "verified" ? "ověřeno" : "čeká"}
                   </span>
+                  {a.kyc !== "verified" && <button className="text-xs text-gold underline" onClick={() => verifyKyc(a.id)}>Simulovat ověření KYC</button>}
                   <span className="chip">{statusLabel[a.status]}</span>
                 </div>
                 <p className="mt-2 text-sm text-ink/85">{a.concept}</p>
@@ -82,7 +118,7 @@ export default function Admin() {
           </div>
         ))}
       </div>
-      <p className="mt-6 text-xs text-muted">Demo: v produkci je admin chráněn přihlášením s 2FA a akce se logují.</p>
+      <p className="mt-6 text-xs text-muted">{live ? "Žádosti se načítají z databáze; každé rozhodnutí se ukládá s e-mailem administrátora." : "Demo režim: žádosti jsou uložené jen v tomto prohlížeči. Po připojení databáze je admin chráněn přihlášením."}</p>
     </div>
   );
 }

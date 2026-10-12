@@ -14,7 +14,7 @@ export default function PostCard({ post, persona }: { post: Post; persona: Perso
   const liked = likes.includes(post.id);
 
   function unlock() {
-    if (!spend(price, `PPV: ${post.caption} (${persona.name})`)) {
+    if (!spend(price, `PPV: ${post.caption} (${persona.name})`, { personaId: persona.id, kind: "ppv", ref: post.id })) {
       alert("Nedostatek kreditu – dobij si peněženku.");
       return;
     }

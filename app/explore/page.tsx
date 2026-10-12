@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { allCategories, personas } from "@/lib/data";
 import PersonaCard from "@/components/PersonaCard";
+import { StoriesRow } from "@/components/Stories";
+import EventBanner from "@/components/EventBanner";
 
 export default function Explore() {
   const [cat, setCat] = useState<string | null>(null);
@@ -24,6 +26,8 @@ export default function Explore() {
   return (
     <div>
       <h1 className="font-display text-5xl">Objevit</h1>
+      <div className="mt-6"><StoriesRow /></div>
+      <div className="mt-4"><EventBanner /></div>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <input className="input sm:max-w-xs" placeholder="Hledat personu…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="input sm:w-48" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>

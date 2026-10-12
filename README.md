@@ -12,7 +12,26 @@ Kurátorská předplatitelská platforma 18+, kde schválení tvůrci provozují
 - **Pro tvůrce** – přehled příjmů, karta persony (povaha, styl psaní, hranice, denní režim), obsah, nabídky, žádost o přijetí s prohlášeními
 - **Admin** – fronta žádostí, schválit / zamítnout s důvodem / pozastavit, blokace schválení bez KYC
 
-Data jsou v demo režimu v prohlížeči (localStorage), platby jsou simulované.
+### Iterace 2
+
+- **Paměť AI** – strukturovaná fakta o fanouškovi (jméno, zájmy, práce), panel „Co si o tobě pamatuje“ s mazáním
+- **Proaktivní zprávy** – persona se sama ozve po odmlce (36 h, v demo zrychlení 90 s), jen když je podle svého režimu vzhůru
+- **Hlasové zprávy** pro VIP (demo: syntéza řeči v prohlížeči, produkce: TTS s vlastním hlasem)
+- **Hromadné zprávy** s PPV nebo balíčkem a segmenty (všichni / VIP / neaktivní / bez PPV), měření otevření a nákupů
+- **Vault a balíčky** – tvůrce skládá balíčky se slevou, AI je nabízí v chatu
+- **Stories na 24 h** s kroužkem neviděných, odpovědí do chatu a stories jen pro předplatitele
+- **Custom požadavky** – zadání → záloha 50 % → přijetí / výroba / doručení do chatu s doplatkem, odmítnutí vrací zálohu
+- **Cíle tipů a akce platformy** – progress bar na profilu i v chatu, sezónní sleva na balíčky
+- **Databáze a účty** – Postgres (Neon / Vercel Postgres), registrace s potvrzením 18+, synchronizace stavu, žádosti tvůrců a admin v DB
+- **Statistiky tvůrce** – příjmy podle zdroje, LTV fanoušků, konverze PPV v chatu, výkon hromadných zpráv, nejlepší čas odeslání
+
+Bez `DATABASE_URL` běží vše v demo režimu v prohlížeči (localStorage), platby jsou simulované.
+
+## Databáze a přihlášení
+
+1. Ve Vercelu: projekt → Storage → Create Database → Neon (Postgres) → připojit k projektu. Tím se nastaví `DATABASE_URL`.
+2. Přidej `ADMIN_EMAILS=tvuj@email.cz` (více adres oddělených čárkou).
+3. Redeploy. Tabulky se založí samy při prvním požadavku.
 
 ## AI chat
 

@@ -31,7 +31,7 @@ export default function Messages() {
                   <span className="ai-badge">AI</span>
                 </div>
                 <p className="truncate text-sm text-muted">
-                  {isTyping ? "píše…" : last ? (last.from === "fan" ? "Ty: " : "") + (last.ppv ? "📎 Placený obsah" : last.text) : "Napiš první zprávu"}
+                  {isTyping ? "píše…" : last ? (last.from === "fan" ? "Ty: " : "") + (last.ppv ? "📎 Placený obsah" : last.bundle ? "📦 Balíček" : last.voice ? "🎙 Hlasová zpráva" : last.text) : "Napiš první zprávu"}
                 </p>
               </div>
               {!!unread[p.id] && <span className="rounded-full bg-rose px-2 py-0.5 text-xs font-bold">{unread[p.id]}</span>}
