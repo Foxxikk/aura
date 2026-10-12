@@ -42,7 +42,7 @@ export function Cover({ p, className = "" }: { p: Persona; className?: string })
 
 export function MediaTile({ hue, locked, className = "" }: { hue: number; locked?: boolean; className?: string }) {
   return (
-    <div className={`grain relative overflow-hidden ${className}`}>
+    <div className={`grain overflow-hidden ${className.includes("absolute") ? "" : "relative"} ${className}`}>
       <div
         className={`absolute inset-0 ${locked ? "scale-110 blur-2xl" : ""}`}
         style={{
