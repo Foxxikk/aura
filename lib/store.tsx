@@ -381,6 +381,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (!isAwake(p)) continue;
         if (s.scheduled.some((x) => x.personaId === p.id)) continue;
         const list = s.chats[p.id] ?? [];
+        const lastReal = [...list].reverse().find((m) => m.from !== "system");
+        // nejvýš jedna nezodpovězená proaktivní zpráva – persona nespamuje
+        if (lastReal?.from === "persona" && lastReal.proactive) continue;
         const lastMsg = list[list.length - 1]?.at ?? s.subscribedAt[p.id] ?? 0;
         if (!lastMsg || Date.now() - lastMsg < quiet) continue;
         if (Date.now() - (s.lastProactive[p.id] ?? 0) < cooldown) continue;
