@@ -27,6 +27,15 @@ export function ensureSchema() {
       await sql`CREATE TABLE IF NOT EXISTS applications (
         id TEXT PRIMARY KEY, data JSONB NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
         created_at TIMESTAMPTZ NOT NULL DEFAULT now())`;
+      await sql`CREATE TABLE IF NOT EXISTS push_subscriptions (
+        endpoint TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, data JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now())`;
+      await sql`CREATE TABLE IF NOT EXISTS reports (
+        id TEXT PRIMARY KEY, data JSONB NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at TIMESTAMPTZ NOT NULL DEFAULT now())`;
+      await sql`CREATE TABLE IF NOT EXISTS moderation_actions (
+        target_id TEXT PRIMARY KEY, kind TEXT NOT NULL, actor TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now())`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT`;
       const [{ count }] = (await sql`SELECT count(*)::int AS count FROM applications`) as { count: number }[];
       if (count === 0) {
         for (const a of seedApplications) {

@@ -118,7 +118,7 @@ export function StoryViewer({ personaId, onClose, onNextPersona }: { personaId: 
         {locked && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 text-center">
             <span className="text-3xl">🔒</span>
-            <p className="text-sm text-white">Story jen pro předplatitele</p>
+            <p className="text-sm text-white">🔒</p>
             <button className="btn-primary" onClick={() => { onClose(); router.push(`/c/${p.handle}#tiers`); }}>Předplatit</button>
           </div>
         )}
@@ -126,7 +126,7 @@ export function StoryViewer({ personaId, onClose, onNextPersona }: { personaId: 
           <p className="font-display text-2xl text-white">{story.caption}</p>
           {subscriptions[personaId] && (
             <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); sendReply(); }}>
-              <input className="input bg-black/40" placeholder={`Odpovědět ${p.name.split(" ")[0]}…`} value={reply}
+              <input className="input bg-black/40" placeholder="…" value={reply}
                 onFocus={() => setPaused(true)} onBlur={() => setPaused(false)} onChange={(e) => setReply(e.target.value)} />
               <button className="btn-primary" disabled={!reply.trim()}>➤</button>
             </form>

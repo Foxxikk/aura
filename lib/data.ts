@@ -368,3 +368,67 @@ export function personaByHandle(handle: string) {
 export function personaById(id: string) {
   return personas.find((p) => p.id === id);
 }
+
+/** Překlady textů person (obsah tvůrce; v produkci je tvůrce zadává sám nebo se překládají strojově). */
+const personaTr: Record<string, Record<"en" | "de", { tagline: string; bio: string }>> = {
+  p1: {
+    en: { tagline: "Photographer, mornings by the sea and black coffee", bio: "I live between Lisbon and Prague. I shoot sunsets, keep a diary and love meeting new people. My profile has exclusive sets from my travels." },
+    de: { tagline: "Fotografin, Morgen am Meer und schwarzer Kaffee", bio: "Ich lebe zwischen Lissabon und Prag. Ich fotografiere Sonnenuntergänge, schreibe Tagebuch und lerne gern neue Leute kennen. Auf meinem Profil findest du exklusive Sets von meinen Reisen." },
+  },
+  p2: {
+    en: { tagline: "Gamer, cosplay and late-night streams", bio: "Night owl. I play RPGs, sew my own costumes and draw. Here I share behind-the-scenes cosplay shoots and things you won't see anywhere else." },
+    de: { tagline: "Gamerin, Cosplay und nächtliche Streams", bio: "Nachteule. Ich spiele RPGs, nähe meine eigenen Kostüme und zeichne. Hier zeige ich Cosplay-Shootings hinter den Kulissen und Dinge, die du sonst nirgends siehst." },
+  },
+  p3: {
+    en: { tagline: "Fitness, yoga and a healthy morning", bio: "Yoga teacher and mountain lover. I share workouts, recipes and hiking photos. Subscribers get my plans and exclusive sets." },
+    de: { tagline: "Fitness, Yoga und ein gesunder Morgen", bio: "Yogalehrerin und Bergliebhaberin. Ich teile Workouts, Rezepte und Wanderfotos. Abonnenten bekommen meine Pläne und exklusive Sets." },
+  },
+  p4: {
+    en: { tagline: "Fashion, wine and evenings in Milan", bio: "Stylist. Elegance, black dresses and good wine. My profile has editorial sets and behind-the-scenes shoots I don't post anywhere else." },
+    de: { tagline: "Mode, Wein und Abende in Mailand", bio: "Stylistin. Eleganz, schwarze Kleider und guter Wein. Auf meinem Profil findest du Editorial-Sets und Shootings hinter den Kulissen, die ich nirgends sonst zeige." },
+  },
+  p5: {
+    en: { tagline: "Surf, van life and sunsets", bio: "I live in a van and chase waves along the coast. Beach photos, morning surf sessions and a travel diary." },
+    de: { tagline: "Surfen, Vanlife und Sonnenuntergänge", bio: "Ich lebe im Van und jage Wellen entlang der Küste. Strandfotos, Morgensurfen und ein Reisetagebuch." },
+  },
+  p6: {
+    en: { tagline: "Pianist, books and rainy days", bio: "I play piano in Paris bars and read everything from Camus to fantasy. Here I share more intimate moments and music." },
+    de: { tagline: "Pianistin, Bücher und Regentage", bio: "Ich spiele Klavier in Pariser Bars und lese alles von Camus bis Fantasy. Hier teile ich persönlichere Momente und Musik." },
+  },
+};
+
+export function personaText(p: Persona, lang: "cs" | "en" | "de") {
+  if (lang === "cs") return { tagline: p.tagline, bio: p.bio };
+  return personaTr[p.id]?.[lang] ?? { tagline: p.tagline, bio: p.bio };
+}
+
+export type LiveEvent = {
+  id: string;
+  personaId: string;
+  title: Record<"cs" | "en" | "de", string>;
+  startsInMin: number; // vůči „teď“ – záporné = už běží
+  durationMin: number;
+  price: number; // 0 = zdarma pro předplatitele
+  poll: { q: Record<"cs" | "en" | "de", string>; options: Record<"cs" | "en" | "de", string>[]; base: number[] };
+};
+
+export const liveEvents: LiveEvent[] = [
+  {
+    id: "ev1", personaId: "p2", startsInMin: -12, durationMin: 60, price: 0,
+    title: { cs: "Noční Q&A: zákulisí cosplaye", en: "Late-night Q&A: cosplay behind the scenes", de: "Nacht-Q&A: Cosplay hinter den Kulissen" },
+    poll: { q: { cs: "Jaký cosplay mám udělat příště?", en: "Which cosplay should I do next?", de: "Welches Cosplay soll ich als Nächstes machen?" },
+      options: [{ cs: "Fantasy elfka", en: "Fantasy elf", de: "Fantasy-Elfe" }, { cs: "Cyberpunk", en: "Cyberpunk", de: "Cyberpunk" }, { cs: "Retro anime", en: "Retro anime", de: "Retro-Anime" }], base: [142, 188, 97] },
+  },
+  {
+    id: "ev2", personaId: "p4", startsInMin: 95, durationMin: 45, price: 9,
+    title: { cs: "Styling večer: podzimní šatník", en: "Styling night: autumn wardrobe", de: "Styling-Abend: Herbstgarderobe" },
+    poll: { q: { cs: "Jakou barvu nosit tento podzim?", en: "Which colour this autumn?", de: "Welche Farbe diesen Herbst?" },
+      options: [{ cs: "Bordó", en: "Burgundy", de: "Bordeaux" }, { cs: "Olivová", en: "Olive", de: "Oliv" }, { cs: "Černá", en: "Black", de: "Schwarz" }], base: [64, 41, 88] },
+  },
+  {
+    id: "ev3", personaId: "p1", startsInMin: 26 * 60, durationMin: 60, price: 0,
+    title: { cs: "Ranní káva s Elenou: plánujeme focení", en: "Morning coffee with Elena: planning a shoot", de: "Morgenkaffee mit Elena: wir planen ein Shooting" },
+    poll: { q: { cs: "Kde má být další focení?", en: "Where should the next shoot be?", de: "Wo soll das nächste Shooting sein?" },
+      options: [{ cs: "Útesy v Sintře", en: "Sintra cliffs", de: "Klippen von Sintra" }, { cs: "Pražské střechy", en: "Prague rooftops", de: "Prager Dächer" }, { cs: "Azory", en: "Azores", de: "Azoren" }], base: [53, 71, 66] },
+  },
+];

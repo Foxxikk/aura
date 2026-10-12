@@ -61,6 +61,23 @@ export type Broadcast = {
   purchases: number;
 };
 
+export type Lang = "cs" | "en" | "de";
+
+export type Report = {
+  id: string;
+  target: "post" | "message" | "persona" | "live";
+  targetId: string;
+  personaId?: string;
+  reason: string;
+  note?: string;
+  excerpt?: string;
+  source: "user" | "auto";
+  createdAt: number;
+  status: "open" | "kept" | "hidden" | "suspended";
+};
+
+export type StudioMember = { id: string; email: string; role: "owner" | "editor" | "operator" | "accountant"; invitedAt: number; accepted: boolean };
+
 export type State = {
   ageVerified: boolean;
   balance: number;
@@ -82,6 +99,22 @@ export type State = {
   tipsToGoal: Record<string, number>;
   lastFanActivity: Record<string, number>;
   lastProactive: Record<string, number>;
+  lang: Lang;
+  visitDays: string[];
+  claimedBadges: string[];
+  reports: Report[];
+  hiddenPosts: string[];
+  suspendedPersonas: string[];
+  eventReminders: string[];
+  eventVotes: Record<string, number>;
+  eventJoined: string[];
+  referralCode: string;
+  referredBy?: string;
+  referralCredits: number;
+  studioMembers: StudioMember[];
+  creatorPersonaId: string;
+  creatorRole: StudioMember["role"];
+  notificationsEnabled: boolean;
 };
 
 const initial: State = {
@@ -105,6 +138,25 @@ const initial: State = {
   tipsToGoal: {},
   lastFanActivity: {},
   lastProactive: {},
+  lang: "cs",
+  visitDays: [],
+  claimedBadges: [],
+  reports: [],
+  hiddenPosts: [],
+  suspendedPersonas: [],
+  eventReminders: [],
+  eventVotes: {},
+  eventJoined: [],
+  referralCode: "",
+  referralCredits: 0,
+  studioMembers: [
+    { id: "m1", email: "majitel@northlight.example", role: "owner", invitedAt: Date.now() - 90 * 86_400_000, accepted: true },
+    { id: "m2", email: "obsah@northlight.example", role: "editor", invitedAt: Date.now() - 40 * 86_400_000, accepted: true },
+    { id: "m3", email: "chat@northlight.example", role: "operator", invitedAt: Date.now() - 12 * 86_400_000, accepted: true },
+  ],
+  creatorPersonaId: "p1",
+  creatorRole: "owner",
+  notificationsEnabled: false,
 };
 
 const KEY = "aura-state-v2";
@@ -165,6 +217,17 @@ export function scheduleReplies(
   return items;
 }
 
+function notify(personaId: string, msg: ChatMessage) {
+  const p = personas.find((x) => x.id === personaId);
+  if (!p || typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  const body = msg.ppv ? "📎 Poslala ti placený obsah" : msg.bundle ? "📦 Nabídka balíčku" : msg.voice ? "🎙 Hlasová zpráva" : msg.text;
+  navigator.serviceWorker?.getRegistration().then((reg) => {
+    const opts = { body, tag: `chat-${personaId}`, icon: "/icon.svg", badge: "/icon.svg", data: { url: `/messages/${p.handle}` } };
+    if (reg) reg.showNotification(`${p.name} · AI persona`, opts);
+    else new Notification(`${p.name} · AI persona`, opts);
+  }).catch(() => {});
+}
+
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<State>(initial);
   const [ready, setReady] = useState(false);
@@ -184,16 +247,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (remote?.state) setState((s) => ({ ...s, ...migrate(remote.state), ageVerified: true }));
         setSyncState("synced");
       } else setSyncState("local");
+      if (me.dbEnabled) {
+        const mod = await fetch("/api/moderation/public").then((r) => r.json()).catch(() => null);
+        if (mod) setState((s) => ({ ...s, hiddenPosts: mod.hidden, suspendedPersonas: mod.suspended }));
+      }
     } catch {
       setSyncState("local");
     }
   }, []);
 
   useEffect(() => {
+    let loaded: Partial<State> = {};
     try {
       const raw = localStorage.getItem(KEY) ?? localStorage.getItem("aura-state-v1");
-      if (raw) setState({ ...initial, ...migrate(JSON.parse(raw)) });
+      if (raw) loaded = migrate(JSON.parse(raw));
     } catch {}
+    const today = new Date().toISOString().slice(0, 10);
+    const nav = (typeof navigator !== "undefined" ? navigator.language : "cs").slice(0, 2);
+    const ref = new URLSearchParams(window.location.search).get("ref") ?? undefined;
+    setState(() => {
+      const base = { ...initial, ...loaded };
+      return {
+        ...base,
+        lang: loaded.lang ?? (nav === "de" ? "de" : nav === "en" ? "en" : "cs"),
+        visitDays: base.visitDays.includes(today) ? base.visitDays : [...base.visitDays, today].slice(-60),
+        referralCode: base.referralCode || Math.random().toString(36).slice(2, 8).toUpperCase(),
+        referredBy: base.referredBy ?? (ref && ref !== base.referralCode ? ref.toUpperCase() : undefined),
+      };
+    });
     setReady(true);
     refreshUser();
   }, [refreshUser]);
@@ -240,6 +321,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const due = s.scheduled.filter((sc) => now >= sc.deliverAt);
         if (due.length) {
           changed = true;
+          if (s.notificationsEnabled && typeof document !== "undefined" && document.hidden) notify(due[0].personaId, due[0].msg);
           for (const sc of due) {
             chats[sc.personaId] = [...(chats[sc.personaId] ?? []), { ...sc.msg, at: sc.deliverAt }];
             unread[sc.personaId] = (unread[sc.personaId] ?? 0) + 1;

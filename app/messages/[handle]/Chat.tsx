@@ -9,11 +9,17 @@ import { PresenceDot } from "@/components/PersonaCard";
 import VoiceBubble from "@/components/VoiceBubble";
 import TipGoal from "@/components/TipGoal";
 import { localTime, replyTiming } from "@/lib/realism";
+import { useT } from "@/lib/i18n";
+import { finalPrice, loyalty } from "@/lib/loyalty";
+import { checkText, modLabels } from "@/lib/moderation";
+import ReportButton from "@/components/ReportButton";
 
 export default function Chat({ handle }: { handle: string }) {
   const p = personaByHandle(handle)!;
   const store = useStore();
-  const { chats, subscriptions, scheduled, memory, unlocked, bundles, fastMode, set, spend, ready } = store;
+  const { chats, subscriptions, scheduled, memory, unlocked, bundles, fastMode, set, spend, ready, lang } = store;
+  const t = useT();
+  const loyaltyOff = loyalty(store).level.discount;
   const msgs = chats[p.id] ?? [];
   const sub = subscriptions[p.id];
   const isVip = sub === "vip";
@@ -49,7 +55,7 @@ export default function Chat({ handle }: { handle: string }) {
       if (!s.chats[p.id]?.length) {
         next.chats = {
           ...s.chats,
-          [p.id]: [{ id: "sys", from: "system", text: `${p.name} je AI persona. Odpovědi generuje umělá inteligence v jejím charakteru.`, at: Date.now() }],
+          [p.id]: [{ id: "sys", from: "system", text: t("chat.aiNote", { name: p.name }), at: Date.now() }],
         };
       }
       return next;
@@ -69,6 +75,7 @@ export default function Chat({ handle }: { handle: string }) {
       body: JSON.stringify({
         personaId: p.id,
         mode,
+        lang,
         tier: sub,
         history: history.map(({ from, text }) => ({ from, text })),
         memory: mem,
@@ -114,11 +121,17 @@ export default function Chat({ handle }: { handle: string }) {
     const fanMsg: ChatMessage = {
       id: crypto.randomUUID(),
       from: "fan",
-      text: extraOpts?.voiceRequest ? "Pošleš mi hlasovku? 🎙" : extraOpts?.tip ? `Poslal(a) jsem tip ${extraOpts.tip} € 💛${body ? " – " + body : ""}` : body,
+      text: extraOpts?.voiceRequest ? t("chat.voiceAsk") : extraOpts?.tip ? `${t("chat.tipSent", { n: extraOpts.tip })}${body ? " – " + body : ""}` : body,
       at: Date.now(),
       status: "sent",
       tip: extraOpts?.tip,
     };
+    const check = checkText(fanMsg.text);
+    if (!check.ok) {
+      set((s) => ({ reports: [{ id: crypto.randomUUID(), target: "message", targetId: fanMsg.id, personaId: p.id, reason: check.category, excerpt: fanMsg.text.slice(0, 200), source: "auto", createdAt: Date.now(), status: "open" }, ...s.reports] }));
+      if (store.dbEnabled) fetch("/api/moderation", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ target: "message", targetId: fanMsg.id, personaId: p.id, reason: check.category, excerpt: fanMsg.text.slice(0, 200), source: "auto" }) }).catch(() => {});
+      return alert(t("chat.blocked", { reason: modLabels[check.category][lang] }));
+    }
     setText("");
     set((s) => ({ chats: { ...s.chats, [p.id]: [...(s.chats[p.id] ?? []), fanMsg] }, lastFanActivity: { ...s.lastFanActivity, [p.id]: Date.now() } }));
     setTimeout(
@@ -130,8 +143,8 @@ export default function Chat({ handle }: { handle: string }) {
 
   function unlockPpv(m: ChatMessage) {
     if (!m.ppv) return;
-    const price = isVip ? Math.round(m.ppv.price * 0.8 * 100) / 100 : m.ppv.price;
-    if (!spend(price, `PPV ve zprávě: ${m.ppv.title} (${p.name})`, { personaId: p.id, kind: "ppv", ref: m.broadcastId ?? m.ppv.postId })) return alert("Nedostatek kreditu – dobij si peněženku.");
+    const price = finalPrice(m.ppv.price, { vip: isVip, loyaltyDiscount: loyaltyOff });
+    if (!spend(price, `PPV ve zprávě: ${m.ppv.title} (${p.name})`, { personaId: p.id, kind: "ppv", ref: m.broadcastId ?? m.ppv.postId })) return alert(t("credit.low"));
     set((s) => ({
       unlocked: [...s.unlocked, m.ppv!.postId],
       broadcasts: m.broadcastId ? s.broadcasts.map((b) => (b.id === m.broadcastId ? { ...b, purchases: b.purchases + 1 } : b)) : s.broadcasts,
@@ -141,7 +154,8 @@ export default function Chat({ handle }: { handle: string }) {
   function buyBundle(m: ChatMessage) {
     const b = bundles.find((x) => x.id === m.bundle?.bundleId);
     if (!b || !m.bundle) return;
-    if (!spend(m.bundle.price, `Balíček: ${b.title} (${p.name})`, { personaId: p.id, kind: "bundle", ref: m.broadcastId ?? b.id })) return alert("Nedostatek kreditu – dobij si peněženku.");
+    const bprice = finalPrice(m.bundle.price, { loyaltyDiscount: loyaltyOff });
+    if (!spend(bprice, `Balíček: ${b.title} (${p.name})`, { personaId: p.id, kind: "bundle", ref: m.broadcastId ?? b.id })) return alert(t("credit.low"));
     set((s) => ({
       unlocked: Array.from(new Set([...s.unlocked, ...b.postIds])),
       broadcasts: m.broadcastId ? s.broadcasts.map((x) => (x.id === m.broadcastId ? { ...x, purchases: x.purchases + 1 } : x)) : s.broadcasts,
@@ -149,7 +163,7 @@ export default function Chat({ handle }: { handle: string }) {
   }
 
   function tip(amount: number) {
-    if (!spend(amount, `Tip – ${p.name}`, { personaId: p.id, kind: "tip" })) return alert("Nedostatek kreditu – dobij si peněženku.");
+    if (!spend(amount, `Tip – ${p.name}`, { personaId: p.id, kind: "tip" })) return alert(t("credit.low"));
     set((s) => ({ tipsToGoal: { ...s.tipsToGoal, [p.id]: (s.tipsToGoal[p.id] ?? 0) + amount } }));
     send({ tip: amount });
   }
@@ -168,9 +182,9 @@ export default function Chat({ handle }: { handle: string }) {
     return (
       <div className="card mx-auto mt-10 max-w-md p-8 text-center">
         <Avatar p={p} size={80} />
-        <h1 className="mt-4 font-display text-3xl">Chat s {p.name.split(" ")[0]}</h1>
-        <p className="mt-2 text-sm text-muted">Chat je dostupný předplatitelům.</p>
-        <Link href={`/c/${p.handle}#tiers`} className="btn-primary mt-6">Vybrat předplatné</Link>
+        <h1 className="mt-4 font-display text-3xl">{t("chat.with", { name: p.name.split(" ")[0] })}</h1>
+        <p className="mt-2 text-sm text-muted">{t("chat.subsOnly")}</p>
+        <Link href={`/c/${p.handle}#tiers`} className="btn-primary mt-6">{t("chat.choose")}</Link>
       </div>
     );
   }
@@ -187,11 +201,11 @@ export default function Chat({ handle }: { handle: string }) {
               <span className="ai-badge">AI persona</span>
             </div>
             <div className="flex flex-wrap items-center gap-x-3">
-              {typing ? <span className="text-xs text-gold">{recording ? "nahrává hlasovku…" : "píše…"}</span> : <PresenceDot p={p} />}
-              <span className="text-xs text-muted">· u ní je {localTime(p.timezone)}</span>
+              {typing ? <span className="text-xs text-gold">{recording ? t("chat.recording") : t("chat.typing")}</span> : <PresenceDot p={p} />}
+              <span className="text-xs text-muted">· {t("chat.localTime", { t: localTime(p.timezone) })}</span>
             </div>
           </div>
-          <button className="chip lg:hidden" onClick={() => setShowMem(!showMem)}>Paměť</button>
+          <button className="chip lg:hidden" onClick={() => setShowMem(!showMem)}>{t("chat.memory")}</button>
         </div>
 
         {showMem && <div className="border-b border-line p-4 lg:hidden"><MemoryPanel mem={mem} name={p.name} forget={forget} /></div>}
@@ -205,7 +219,7 @@ export default function Chat({ handle }: { handle: string }) {
             if (m.ppv) {
               const open = unlocked.includes(m.ppv.postId);
               const post = posts.find((x) => x.id === m.ppv!.postId);
-              const price = isVip ? Math.round(m.ppv.price * 0.8 * 100) / 100 : m.ppv.price;
+              const price = finalPrice(m.ppv.price, { vip: isVip, loyaltyDiscount: loyaltyOff });
               return (
                 <div key={m.id} className="space-y-1">
                   {m.text && <div className="max-w-[78%] rounded-2xl rounded-bl-md bg-surface-2 px-4 py-2 text-sm">{m.text}</div>}
@@ -238,18 +252,19 @@ export default function Chat({ handle }: { handle: string }) {
                     </div>
                     <p className="mt-2 text-sm font-semibold">{m.bundle.title}</p>
                     <p className="text-xs text-muted">{b?.postIds.length} položek · −{b?.discount}% + akce −{currentEvent.bundleDiscount}%</p>
-                    {owned ? <p className="mt-2 text-xs text-ok">Odemčeno</p> : <button className="btn-primary mt-2 w-full" onClick={() => buyBundle(m)}>Koupit za {m.bundle.price} €</button>}
+                    {owned ? <p className="mt-2 text-xs text-ok">{t("profile.unlocked")}</p> : <button className="btn-primary mt-2 w-full" onClick={() => buyBundle(m)}>{t("chat.buy", { p: finalPrice(m.bundle.price, { loyaltyDiscount: loyaltyOff }) })}</button>}
                   </div>
                 </div>
               );
             }
             if (m.voice) return <div key={m.id}><VoiceBubble text={m.text} seconds={m.voice.seconds} pitch={1 + (p.hue % 30) / 100} /></div>;
             return (
-              <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
+              <div key={m.id} className={`group flex flex-col ${mine ? "items-end" : "items-start"}`}>
                 <div className={`max-w-[78%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${mine ? "rounded-br-md bg-gradient-to-br from-gold to-rose text-[#1a0f12]" : "rounded-bl-md bg-surface-2"}`}>
                   {m.text}
                 </div>
-                {lastMine && <span className="mt-1 text-[10px] text-muted">{m.status === "read" ? "Přečteno" : m.status === "delivered" ? "Doručeno" : "Odesláno"}</span>}
+                {!mine && <ReportButton target="message" targetId={m.id} personaId={p.id} excerpt={m.text} className="mt-0.5 opacity-0 transition group-hover:opacity-100" label={`⚑ ${t("post.report")}`} />}
+                {lastMine && <span className="mt-1 text-[10px] text-muted">{m.status === "read" ? t("chat.read") : m.status === "delivered" ? t("chat.delivered") : t("chat.sent")}</span>}
               </div>
             );
           })}
@@ -265,23 +280,23 @@ export default function Chat({ handle }: { handle: string }) {
         <div className="border-t border-line p-3">
           <div className="mb-2 flex flex-wrap gap-2">
             {[3, 5, 10].map((a) => (
-              <button key={a} className="chip hover:border-gold hover:text-gold" onClick={() => tip(a)}>Tip {a} €</button>
+              <button key={a} className="chip hover:border-gold hover:text-gold" onClick={() => tip(a)}>{t("chat.tip", { n: a })}</button>
             ))}
             <button
               className={`chip ${isVip ? "hover:border-gold hover:text-gold" : "opacity-50"}`}
               title={isVip ? "" : "Hlasovky jsou pro VIP"}
-              onClick={() => (isVip ? send({ voiceRequest: true }) : alert("Hlasové zprávy jsou benefit VIP úrovně."))}
+              onClick={() => (isVip ? send({ voiceRequest: true }) : alert(t("chat.voiceVip")))}
             >
-              🎙 Hlasovka {isVip ? "" : "· VIP"}
+              🎙 {t("chat.voice")} {isVip ? "" : "· VIP"}
             </button>
           </div>
           <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2">
-            <input className="input" placeholder="Napiš zprávu…" value={text} onChange={(e) => setText(e.target.value)} />
-            <button className="btn-primary" disabled={!text.trim()}>Odeslat</button>
+            <input className="input" placeholder={t("chat.placeholder")} value={text} onChange={(e) => setText(e.target.value)} />
+            <button className="btn-primary" disabled={!text.trim()}>{t("chat.send")}</button>
           </form>
           <label className="mt-2 flex cursor-pointer items-center gap-2 text-[11px] text-muted" title="Pro demo zkrátí čekání na odpověď i proaktivní zprávy">
             <input type="checkbox" checked={fastMode} onChange={(e) => set(() => ({ fastMode: e.target.checked }))} />
-            Demo zrychlení (vypnuto = realistické tempo: odpovědi za minuty, proaktivní zpráva po 36 h ticha)
+            {t("chat.fast")}
           </label>
         </div>
       </div>
@@ -295,15 +310,16 @@ export default function Chat({ handle }: { handle: string }) {
 }
 
 function MemoryPanel({ mem, name, forget }: { mem: { name?: string; facts: string[] }; name: string; forget: (i: number | "name" | "all") => void }) {
+  const t = useT();
   return (
     <div>
-      <h3 className="text-sm font-semibold">Co si o tobě {name.split(" ")[0]} pamatuje</h3>
-      <p className="mt-1 text-[11px] text-muted">AI si ukládá fakta, která jí napíšeš. Můžeš je kdykoli smazat.</p>
-      {!mem.name && !mem.facts.length && <p className="mt-3 text-xs text-muted">Zatím nic. Zkus jí napsat, jak se jmenuješ nebo co tě baví.</p>}
+      <h3 className="text-sm font-semibold">{t("chat.memTitle", { name: name.split(" ")[0] })}</h3>
+      <p className="mt-1 text-[11px] text-muted">{t("chat.memNote")}</p>
+      {!mem.name && !mem.facts.length && <p className="mt-3 text-xs text-muted">{t("chat.memEmpty")}</p>}
       <ul className="mt-3 space-y-1.5 text-xs">
         {mem.name && (
           <li className="flex items-start justify-between gap-2 rounded-lg bg-surface-2 px-2 py-1.5">
-            <span>Jméno: <b>{mem.name}</b></span>
+            <span>{t("chat.memName")}: <b>{mem.name}</b></span>
             <button onClick={() => forget("name")} className="text-muted hover:text-rose" aria-label="Smazat">×</button>
           </li>
         )}
@@ -314,7 +330,7 @@ function MemoryPanel({ mem, name, forget }: { mem: { name?: string; facts: strin
           </li>
         ))}
       </ul>
-      {(mem.name || mem.facts.length > 0) && <button onClick={() => forget("all")} className="mt-3 text-[11px] text-muted underline">Smazat celou paměť</button>}
+      {(mem.name || mem.facts.length > 0) && <button onClick={() => forget("all")} className="mt-3 text-[11px] text-muted underline">{t("chat.memClear")}</button>}
     </div>
   );
 }

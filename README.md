@@ -25,6 +25,21 @@ Kurátorská předplatitelská platforma 18+, kde schválení tvůrci provozují
 - **Databáze a účty** – Postgres (Neon / Vercel Postgres), registrace s potvrzením 18+, synchronizace stavu, žádosti tvůrců a admin v DB
 - **Statistiky tvůrce** – příjmy podle zdroje, LTV fanoušků, konverze PPV v chatu, výkon hromadných zpráv, nejlepší čas odeslání
 
+### Iterace 3
+
+- **Feed „Pro tebe“** – doporučení podle předplatného, chatu, lajků, nákupů a kategorií, s vysvětlením „proč“
+- **Věrnostní program** – body, úrovně Bronz → Platina se slevami, denní série, odznaky (`/rewards`)
+- **PWA a notifikace** – instalace jako aplikace, offline shell, upozornění na nové zprávy; web push připravený (VAPID klíče)
+- **Moderace** – nahlášení příspěvků, zpráv, profilů a událostí, automatický filtr textu (fanoušek i AI), fronta s prioritou, skrytí obsahu a pozastavení persony
+- **Živé události** – skupinový chat s personou, ankety, vstupenky, připomínky (`/live`)
+- **Referral** – osobní odkaz a kód, statistiky, odměny pro fanoušky i doporučení tvůrců (`/invite`)
+- **Studio účty** – víc person v jednom studiu, tým s rolemi a oprávněními, výplaty podle persony
+- **Jazykové verze** – čeština, angličtina, němčina pro fanouškovskou část; AI odpovídá v jazyce fanouška
+
+### Web push
+
+Pro upozornění i při zavřené aplikaci vygeneruj klíče (`npx web-push generate-vapid-keys`) a nastav ve Vercelu `NEXT_PUBLIC_VAPID_PUBLIC_KEY` a `VAPID_PRIVATE_KEY`.
+
 Bez `DATABASE_URL` běží vše v demo režimu v prohlížeči (localStorage), platby jsou simulované.
 
 ## Databáze a přihlášení

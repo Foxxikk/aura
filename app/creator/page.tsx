@@ -6,9 +6,24 @@ import { bundlePrice, currentEvent, personas, posts } from "@/lib/data";
 import { Broadcast, ChatMessage, CustomRequest, Segment, useStore } from "@/lib/store";
 import { Avatar, MediaTile } from "@/components/Visuals";
 
-// Demo: přihlášený tvůrce je studio Northlight s personou Elena Voss.
-const persona = personas[0];
-const myPosts = posts.filter((x) => x.personaId === persona.id);
+// Demo: přihlášený tvůrce je studio Northlight Studio, které provozuje víc person.
+const STUDIO = "Northlight Studio";
+const studioPersonas = personas.filter((p) => p.creatorStudio === STUDIO);
+
+function useCreator() {
+  const { creatorPersonaId } = useStore();
+  const persona = studioPersonas.find((p) => p.id === creatorPersonaId) ?? studioPersonas[0];
+  return { persona, myPosts: posts.filter((x) => x.personaId === persona.id) };
+}
+
+type Role = "owner" | "editor" | "operator" | "accountant";
+const roleLabel: Record<Role, string> = { owner: "Vlastník", editor: "Editor obsahu", operator: "Chat operátor", accountant: "Účetní" };
+const roleTabs: Record<Role, string[]> = {
+  owner: ["overview", "broadcast", "vault", "requests", "persona", "team", "payouts"],
+  editor: ["vault", "requests", "persona"],
+  operator: ["broadcast", "requests"],
+  accountant: ["overview", "payouts"],
+};
 
 // Barvy grafů ověřené validátorem (tmavý povrch, CVD).
 const SERIES = [
@@ -33,26 +48,38 @@ const segments: { id: Segment; label: string; share: number; hint: string }[] = 
   { id: "no_ppv", label: "Ještě nekoupili PPV", share: 0.41, hint: "první nákup" },
 ];
 
-type Tab = "overview" | "broadcast" | "vault" | "requests" | "persona";
+type Tab = "overview" | "broadcast" | "vault" | "requests" | "persona" | "team" | "payouts";
 
 export default function Creator() {
   const store = useStore();
-  const [tab, setTab] = useState<Tab>("overview");
+  const { persona } = useCreator();
+  const { creatorRole, set } = store;
+  const allowed = roleTabs[creatorRole];
+  const [tabRaw, setTab] = useState<Tab>("overview");
+  const tab: Tab = allowed.includes(tabRaw) ? tabRaw : (allowed[0] as Tab);
   const pendingReq = store.customRequests.filter((r) => r.personaId === persona.id && (r.status === "requested" || r.status === "accepted" || r.status === "in_progress")).length;
 
   return (
     <div>
       <div className="flex flex-wrap items-center gap-4">
         <Avatar p={persona} size={56} />
-        <div className="flex-1">
-          <p className="text-xs uppercase tracking-wider text-muted">Studio {persona.creatorStudio}</p>
-          <h1 className="font-display text-4xl">{persona.name}</h1>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs uppercase tracking-wider text-muted">Studio {STUDIO} · {studioPersonas.length} persony</p>
+          <select className="mt-1 bg-transparent font-display text-4xl outline-none" value={persona.id} onChange={(e) => set(() => ({ creatorPersonaId: e.target.value }))}>
+            {studioPersonas.map((p) => <option key={p.id} value={p.id} className="bg-surface text-base">{p.name}</option>)}
+          </select>
         </div>
+        <label className="text-xs text-muted">
+          Zobrazit jako
+          <select className="input mt-1 py-1.5" value={creatorRole} onChange={(e) => set(() => ({ creatorRole: e.target.value as Role }))}>
+            {(Object.keys(roleLabel) as Role[]).map((r) => <option key={r} value={r}>{roleLabel[r]}</option>)}
+          </select>
+        </label>
         <Link href={`/c/${persona.handle}`} className="btn-ghost">Zobrazit profil</Link>
       </div>
 
       <div className="mt-6 flex gap-2 overflow-x-auto border-b border-line">
-        {([["overview", "Statistiky"], ["broadcast", "Hromadné zprávy"], ["vault", "Vault a balíčky"], ["requests", `Na přání${pendingReq ? ` (${pendingReq})` : ""}`], ["persona", "Persona a chat"]] as const).map(([k, l]) => (
+        {([["overview", "Statistiky"], ["broadcast", "Hromadné zprávy"], ["vault", "Vault a balíčky"], ["requests", `Na přání${pendingReq ? ` (${pendingReq})` : ""}`], ["persona", "Persona a chat"], ["team", "Tým"], ["payouts", "Výplaty"]] as const).filter(([k]) => allowed.includes(k)).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} className={`-mb-px shrink-0 border-b-2 px-4 py-2 text-sm ${tab === k ? "border-gold" : "border-transparent text-muted"}`}>{l}</button>
         ))}
       </div>
@@ -62,6 +89,8 @@ export default function Creator() {
       {tab === "vault" && <Vault />}
       {tab === "requests" && <Requests />}
       {tab === "persona" && <PersonaCard />}
+      {tab === "team" && <Team />}
+      {tab === "payouts" && <Payouts />}
     </div>
   );
 }
@@ -69,6 +98,8 @@ export default function Creator() {
 /* ---------------- Statistiky ---------------- */
 
 function Overview() {
+  const { persona, myPosts } = useCreator();
+  void myPosts;
   const { transactions, chats, broadcasts } = useStore();
   const mine = transactions.filter((t) => t.personaId === persona.id && t.amount < 0);
   const sumKind = (k: string[]) => mine.filter((t) => k.includes(t.kind ?? "")).reduce((s, t) => s - t.amount, 0);
@@ -218,6 +249,8 @@ function BroadcastTable({ list }: { list: Broadcast[] }) {
 /* ---------------- Hromadné zprávy ---------------- */
 
 function Broadcasts() {
+  const { persona, myPosts } = useCreator();
+  void myPosts;
   const store = useStore();
   const { bundles, broadcasts, subscriptions, lastFanActivity, transactions, set } = store;
   const [text, setText] = useState("");
@@ -317,6 +350,8 @@ function Broadcasts() {
 /* ---------------- Vault a balíčky ---------------- */
 
 function Vault() {
+  const { persona, myPosts } = useCreator();
+  void myPosts;
   const { bundles, set } = useStore();
   const [filter, setFilter] = useState<"all" | "free" | "subscribers" | "ppv">("all");
   const [sel, setSel] = useState<string[]>([]);
@@ -397,6 +432,8 @@ function Vault() {
 /* ---------------- Požadavky na přání ---------------- */
 
 function Requests() {
+  const { persona, myPosts } = useCreator();
+  void myPosts;
   const { customRequests, set } = useStore();
   const list = customRequests.filter((r) => r.personaId === persona.id);
 
@@ -447,6 +484,8 @@ function Requests() {
 /* ---------------- Persona a chat ---------------- */
 
 function PersonaCard() {
+  const { persona, myPosts } = useCreator();
+  void myPosts;
   const [card, setCard] = useState({ personality: persona.personality, writingStyle: persona.writingStyle, boundaries: persona.boundaries, wake: persona.schedule.wake, sleep: persona.schedule.sleep });
   const [saved, setSaved] = useState(false);
   return (
@@ -477,5 +516,107 @@ function PersonaCard() {
       <button className="btn-primary">{saved ? "Uloženo ✓" : "Uložit kartu persony"}</button>
       <p className="text-xs text-muted">Demo: změny se neukládají na server.</p>
     </form>
+  );
+}
+
+/* ---------------- Tým studia ---------------- */
+
+const perms: { label: string; roles: Role[] }[] = [
+  { label: "Statistiky a příjmy", roles: ["owner", "accountant"] },
+  { label: "Hromadné zprávy", roles: ["owner", "operator"] },
+  { label: "Vault, balíčky, nahrávání", roles: ["owner", "editor"] },
+  { label: "Požadavky na přání", roles: ["owner", "editor", "operator"] },
+  { label: "Karta persony a nastavení AI", roles: ["owner", "editor"] },
+  { label: "Tým a role", roles: ["owner"] },
+  { label: "Výplaty a faktury", roles: ["owner", "accountant"] },
+];
+
+function Team() {
+  const { studioMembers, set } = useStore();
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<Role>("operator");
+  return (
+    <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_380px]">
+      <div className="card p-6">
+        <h2 className="font-semibold">Členové studia</h2>
+        <ul className="mt-3 divide-y divide-line">
+          {studioMembers.map((m) => (
+            <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+              <div>
+                <p>{m.email}</p>
+                <p className="text-xs text-muted">{m.accepted ? "Aktivní" : "Pozvánka odeslána"} · od {new Date(m.invitedAt).toLocaleDateString("cs-CZ")}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select className="input w-auto py-1.5" value={m.role} disabled={m.role === "owner"} onChange={(e) => set((s) => ({ studioMembers: s.studioMembers.map((x) => (x.id === m.id ? { ...x, role: e.target.value as Role } : x)) }))}>
+                  {(Object.keys(roleLabel) as Role[]).map((r) => <option key={r} value={r}>{roleLabel[r]}</option>)}
+                </select>
+                {m.role !== "owner" && <button className="text-xs text-muted hover:text-rose" onClick={() => set((s) => ({ studioMembers: s.studioMembers.filter((x) => x.id !== m.id) }))}>Odebrat</button>}
+              </div>
+            </li>
+          ))}
+        </ul>
+        <form className="mt-4 flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); set((s) => ({ studioMembers: [...s.studioMembers, { id: crypto.randomUUID(), email, role, invitedAt: Date.now(), accepted: false }] })); setEmail(""); }}>
+          <input className="input flex-1" type="email" placeholder="e-mail nového člena" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <select className="input w-auto" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+            {(Object.keys(roleLabel) as Role[]).filter((r) => r !== "owner").map((r) => <option key={r} value={r}>{roleLabel[r]}</option>)}
+          </select>
+          <button className="btn-primary" disabled={!email.includes("@")}>Pozvat</button>
+        </form>
+        <p className="mt-2 text-[11px] text-muted">Demo: pozvánka se neposílá e-mailem. Každý člen týmu musí projít ověřením identity.</p>
+      </div>
+      <div className="card p-6">
+        <h2 className="font-semibold">Oprávnění rolí</h2>
+        <table className="mt-3 w-full text-xs">
+          <thead><tr className="text-left text-muted"><th className="py-1 font-normal" />{(Object.keys(roleLabel) as Role[]).map((r) => <th key={r} className="px-1 text-center font-normal">{roleLabel[r].split(" ")[0]}</th>)}</tr></thead>
+          <tbody className="divide-y divide-line">
+            {perms.map((p) => (
+              <tr key={p.label}><td className="py-2 pr-2">{p.label}</td>{(Object.keys(roleLabel) as Role[]).map((r) => <td key={r} className="text-center">{p.roles.includes(r) ? <span className="text-ok">✓</span> : <span className="text-muted">–</span>}</td>)}</tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="mt-3 text-[11px] text-muted">Přepínačem „Zobrazit jako“ nahoře si vyzkoušíš, co která role vidí.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Výplaty ---------------- */
+
+function Payouts() {
+  const { transactions } = useStore();
+  const rows = studioPersonas.map((p, i) => {
+    const real = transactions.filter((t) => t.personaId === p.id && t.amount < 0).reduce((a, t) => a - t.amount, 0);
+    const gross = [5090, 3870, 2950][i % 3] + real;
+    return { p, gross, fee: gross * 0.2, net: gross * 0.8 };
+  });
+  const total = rows.reduce((a, r) => a + r.net, 0);
+  const history = [
+    { date: "2026-10-06", amount: 6740 }, { date: "2026-09-29", amount: 6410 }, { date: "2026-09-22", amount: 6105 }, { date: "2026-09-15", amount: 5880 },
+  ];
+  const fmt = (n: number) => `${Math.round(n).toLocaleString("cs-CZ")} €`;
+  return (
+    <div className="mt-6 space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="card p-5"><p className="text-xs text-muted">K výplatě v pondělí</p><p className="mt-1 font-display text-3xl">{fmt(total)}</p></div>
+        <div className="card p-5"><p className="text-xs text-muted">Z toho rezerva na chargebacky (7 dní)</p><p className="mt-1 font-display text-3xl">{fmt(total * 0.1)}</p></div>
+        <div className="card p-5"><p className="text-xs text-muted">Výplatní účet</p><p className="mt-1 font-display text-3xl">CZ •• 4417</p></div>
+      </div>
+      <div className="card overflow-x-auto p-6">
+        <h2 className="font-semibold">Tento týden podle persony</h2>
+        <table className="mt-3 w-full min-w-[480px] text-sm">
+          <thead><tr className="text-left text-xs text-muted"><th className="py-1 font-normal">Persona</th><th className="text-right font-normal">Hrubý příjem</th><th className="text-right font-normal">Provize 20 %</th><th className="text-right font-normal">Čistý příjem</th></tr></thead>
+          <tbody className="divide-y divide-line">
+            {rows.map((r) => <tr key={r.p.id}><td className="py-2">{r.p.name}</td><td className="text-right">{fmt(r.gross)}</td><td className="text-right text-muted">−{fmt(r.fee)}</td><td className="text-right font-semibold">{fmt(r.net)}</td></tr>)}
+          </tbody>
+        </table>
+      </div>
+      <div className="card p-6">
+        <h2 className="font-semibold">Historie výplat</h2>
+        <ul className="mt-3 divide-y divide-line text-sm">
+          {history.map((h) => <li key={h.date} className="flex justify-between py-2"><span>{new Date(h.date).toLocaleDateString("cs-CZ")}</span><span>{fmt(h.amount)} · <span className="text-ok">vyplaceno</span></span></li>)}
+        </ul>
+        <p className="mt-3 text-[11px] text-muted">Ilustrační data. V produkci výplaty přes platební bránu s fakturou a vyúčtováním DPH.</p>
+      </div>
+    </div>
   );
 }

@@ -1,27 +1,30 @@
+"use client";
+
 import Link from "next/link";
 import { personas } from "@/lib/data";
 import PersonaCard from "@/components/PersonaCard";
 import { StoriesRow } from "@/components/Stories";
 import EventBanner from "@/components/EventBanner";
+import { useT } from "@/lib/i18n";
+import { useStore } from "@/lib/store";
 
 export default function Home() {
-  const featured = [...personas].sort((a, b) => b.subscribers - a.subscribers).slice(0, 3);
+  const t = useT();
+  const { suspendedPersonas } = useStore();
+  const featured = [...personas].filter((p) => !suspendedPersonas.includes(p.id)).sort((a, b) => b.subscribers - a.subscribers).slice(0, 3);
   return (
     <div className="space-y-12">
       <StoriesRow />
       <section className="grain relative overflow-hidden rounded-3xl border border-line px-6 py-16 sm:px-12 sm:py-24"
         style={{ background: "radial-gradient(ellipse at 15% 20%, #6b2a45 0%, transparent 55%), radial-gradient(ellipse at 90% 80%, #7a4a2c 0%, transparent 50%), #140f13" }}>
-        <span className="ai-badge">Kurátorský výběr AI tvůrců</span>
+        <span className="ai-badge">{t("home.badge")}</span>
         <h1 className="mt-5 max-w-3xl font-display text-5xl leading-[1.02] sm:text-7xl">
-          Persony, které si <i className="text-gold">pamatují</i> tvoje jméno.
+          {t("home.title1")} <i className="text-gold">{t("home.title2")}</i> {t("home.title3")}
         </h1>
-        <p className="mt-5 max-w-xl text-muted">
-          Exkluzivní obsah a chat s AI personami od schválených studií. Každá má vlastní tvář, příběh, náladu i denní
-          rytmus – a vždy víš, že mluvíš s AI.
-        </p>
+        <p className="mt-5 max-w-xl text-muted">{t("home.lead")}</p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/explore" className="btn-primary">Objevit persony</Link>
-          <Link href="/creator/apply" className="btn-ghost">Staň se tvůrcem</Link>
+          <Link href="/explore" className="btn-primary">{t("home.cta")}</Link>
+          <Link href="/creator/apply" className="btn-ghost">{t("home.creator")}</Link>
         </div>
       </section>
 
@@ -29,8 +32,8 @@ export default function Home() {
 
       <section>
         <div className="mb-5 flex items-end justify-between">
-          <h2 className="font-display text-4xl">Nejsledovanější</h2>
-          <Link href="/explore" className="text-sm text-gold">Všechny →</Link>
+          <h2 className="font-display text-4xl">{t("home.top")}</h2>
+          <Link href="/explore" className="text-sm text-gold">{t("home.all")}</Link>
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {featured.map((p) => <PersonaCard key={p.id} p={p} />)}
@@ -38,14 +41,10 @@ export default function Home() {
       </section>
 
       <section className="grid gap-5 md:grid-cols-3">
-        {[
-          ["Chat s osobností", "Persona má povahu, styl psaní, paměť a vlastní časové pásmo. Odpovídá v přirozeném tempu, ne jako automat."],
-          ["Exkluzivní obsah", "Předplatné po úrovních, placené příspěvky, balíčky a sety na přání přímo od tvůrce."],
-          ["Jen schválení tvůrci", "Každé studio prochází ověřením identity a ruční kontrolou. Žádné podoby reálných lidí."],
-        ].map(([t, d]) => (
-          <div key={t} className="card p-6">
-            <h3 className="font-display text-2xl">{t}</h3>
-            <p className="mt-2 text-sm text-muted">{d}</p>
+        {(["f1", "f2", "f3"] as const).map((k) => (
+          <div key={k} className="card p-6">
+            <h3 className="font-display text-2xl">{t(`home.${k}.t`)}</h3>
+            <p className="mt-2 text-sm text-muted">{t(`home.${k}.d`)}</p>
           </div>
         ))}
       </section>

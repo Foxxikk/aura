@@ -10,18 +10,19 @@ import { PresenceDot } from "@/components/PersonaCard";
 import { StoryAvatar, StoryViewer } from "@/components/Stories";
 import TipGoal from "@/components/TipGoal";
 import EventBanner from "@/components/EventBanner";
-
-const statusLabel = {
-  requested: "Čeká na přijetí",
-  accepted: "Přijato",
-  in_progress: "Ve výrobě",
-  delivered: "Doručeno do zpráv",
-  declined: "Odmítnuto (záloha vrácena)",
-} as const;
+import ReportButton from "@/components/ReportButton";
+import { useT } from "@/lib/i18n";
+import { personaText } from "@/lib/data";
+import { finalPrice, loyalty } from "@/lib/loyalty";
+import { checkText, modLabels } from "@/lib/moderation";
 
 export default function Profile({ handle }: { handle: string }) {
   const p = personaByHandle(handle)!;
-  const { subscriptions, spend, set, bundles, unlocked, customRequests } = useStore();
+  const store = useStore();
+  const { subscriptions, spend, set, bundles, unlocked, customRequests, lang, suspendedPersonas } = store;
+  const t = useT();
+  const loyaltyOff = loyalty(store).level.discount;
+  const text = personaText(p, lang);
   const [tab, setTab] = useState<"posts" | "bundles" | "custom">("posts");
   const [storyOpen, setStoryOpen] = useState(false);
   const [req, setReq] = useState({ topic: "", style: "", size: "45" });
@@ -32,21 +33,26 @@ export default function Profile({ handle }: { handle: string }) {
   const myRequests = customRequests.filter((r) => r.personaId === p.id);
 
   function subscribe(tierId: string, price: number, name: string) {
-    if (!spend(price, `Předplatné ${name} – ${p.name}`, { personaId: p.id, kind: "sub", ref: tierId })) return alert("Nedostatek kreditu – dobij si peněženku.");
+    if (!spend(price, `Předplatné ${name} – ${p.name}`, { personaId: p.id, kind: "sub", ref: tierId })) return alert(t("credit.low"));
     set((s) => ({ subscriptions: { ...s.subscriptions, [p.id]: tierId }, subscribedAt: { ...s.subscribedAt, [p.id]: s.subscribedAt[p.id] ?? Date.now() } }));
   }
 
   function buyBundle(id: string) {
     const b = myBundles.find((x) => x.id === id)!;
-    const { price } = bundlePrice(b, currentEvent.bundleDiscount);
-    if (!spend(price, `Balíček: ${b.title} (${p.name})`, { personaId: p.id, kind: "bundle", ref: b.id })) return alert("Nedostatek kreditu – dobij si peněženku.");
+    const price = finalPrice(bundlePrice(b, currentEvent.bundleDiscount).price, { loyaltyDiscount: loyaltyOff });
+    if (!spend(price, `Balíček: ${b.title} (${p.name})`, { personaId: p.id, kind: "bundle", ref: b.id })) return alert(t("credit.low"));
     set((s) => ({ unlocked: Array.from(new Set([...s.unlocked, ...b.postIds])) }));
   }
 
   function submitRequest() {
+    const check = checkText(`${req.topic} ${req.style}`);
+    if (!check.ok) {
+      set((s) => ({ reports: [{ id: crypto.randomUUID(), target: "persona", targetId: p.id, personaId: p.id, reason: check.category, excerpt: req.topic.slice(0, 200), source: "auto", createdAt: Date.now(), status: "open" }, ...s.reports] }));
+      return alert(t("chat.blocked", { reason: modLabels[check.category][lang] }));
+    }
     const price = Number(req.size);
     const deposit = Math.round(price / 2);
-    if (!spend(deposit, `Záloha custom požadavku – ${p.name}`, { personaId: p.id, kind: "custom" })) return alert("Nedostatek kreditu – dobij si peněženku.");
+    if (!spend(deposit, `Záloha custom požadavku – ${p.name}`, { personaId: p.id, kind: "custom" })) return alert(t("credit.low"));
     set((s) => ({
       customRequests: [
         { id: crypto.randomUUID(), personaId: p.id, topic: req.topic, style: req.style, price, deposit, status: "requested", createdAt: Date.now() },
@@ -58,6 +64,7 @@ export default function Profile({ handle }: { handle: string }) {
 
   return (
     <div>
+      {suspendedPersonas.includes(p.id) && <p className="mb-4 rounded-xl border border-rose/40 bg-rose/10 p-3 text-sm text-rose">{t("suspended")}</p>}
       <EventBanner />
       <Cover p={p} className="mt-4 h-52 rounded-3xl sm:h-72" />
       <div className="relative px-2 sm:px-6">
@@ -70,20 +77,20 @@ export default function Profile({ handle }: { handle: string }) {
             </div>
             <p className="text-sm text-muted">@{p.handle} · {p.location} · <PresenceDot p={p} /></p>
           </div>
-          {current ? <Link href={`/messages/${p.handle}`} className="btn-primary">Napsat zprávu</Link> : <a href="#tiers" className="btn-primary">Předplatit</a>}
+          {current ? <Link href={`/messages/${p.handle}`} className="btn-primary">{t("profile.message")}</Link> : <a href="#tiers" className="btn-primary">{t("profile.subscribe")}</a>}
         </div>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
           <div>
-            <p className="text-ink/85">{p.bio}</p>
+            <p className="text-ink/85">{text.bio}</p>
             <div className="mt-3 flex flex-wrap gap-2">{p.categories.map((c) => <span key={c} className="chip">{c}</span>)}</div>
             <p className="mt-3 text-xs text-muted">
-              {p.postsCount} příspěvků · {p.subscribers.toLocaleString("cs-CZ")} předplatitelů · Persona od studia {p.creatorStudio}
+              {t("profile.stats", { posts: p.postsCount, subs: p.subscribers.toLocaleString(lang), studio: p.creatorStudio })}
             </p>
 
             <div className="mt-8 flex gap-2 overflow-x-auto border-b border-line">
-              {([["posts", "Příspěvky"], ["bundles", `Balíčky (${myBundles.length})`], ["custom", "Na přání"]] as const).map(([t, l]) => (
-                <button key={t} onClick={() => setTab(t)} className={`-mb-px shrink-0 border-b-2 px-4 py-2 text-sm ${tab === t ? "border-gold text-ink" : "border-transparent text-muted"}`}>{l}</button>
+              {([["posts", t("profile.posts")], ["bundles", `${t("profile.bundles")} (${myBundles.length})`], ["custom", t("profile.custom")]] as const).map(([k, l]) => (
+                <button key={k} onClick={() => setTab(k)} className={`-mb-px shrink-0 border-b-2 px-4 py-2 text-sm ${tab === k ? "border-gold text-ink" : "border-transparent text-muted"}`}>{l}</button>
               ))}
             </div>
 
@@ -96,7 +103,8 @@ export default function Profile({ handle }: { handle: string }) {
             {tab === "bundles" && (
               <div className="mt-6 space-y-3">
                 {myBundles.map((b) => {
-                  const { full, price } = bundlePrice(b, currentEvent.bundleDiscount);
+                  const { full, price: evPrice } = bundlePrice(b, currentEvent.bundleDiscount);
+                  const price = finalPrice(evPrice, { loyaltyDiscount: loyaltyOff });
                   const owned = b.postIds.every((id) => unlocked.includes(id));
                   return (
                     <div key={b.id} className="card flex flex-wrap items-center gap-4 p-4">
@@ -105,9 +113,9 @@ export default function Profile({ handle }: { handle: string }) {
                       </div>
                       <div className="min-w-0 flex-1">
                         <h3 className="font-semibold">{b.title}</h3>
-                        <p className="text-sm text-muted">{b.postIds.length} položek · balíčková sleva −{b.discount} % · {currentEvent.title} −{currentEvent.bundleDiscount} %</p>
+                        <p className="text-sm text-muted">{t("bundle.desc", { n: b.postIds.length, d: b.discount, event: t("event.title"), e: currentEvent.bundleDiscount })}{loyaltyOff ? ` · ${t("loyaltyOff", { n: loyaltyOff })}` : ""}</p>
                       </div>
-                      {owned ? <span className="text-sm text-ok">Odemčeno</span> : (
+                      {owned ? <span className="text-sm text-ok">{t("profile.unlocked")}</span> : (
                         <button className="btn-primary" onClick={() => buyBundle(b.id)}>
                           <s className="opacity-60">{full} €</s> {price} €
                         </button>
@@ -117,7 +125,7 @@ export default function Profile({ handle }: { handle: string }) {
                 })}
                 {discountOffer && (
                   <div className="card flex items-center justify-between gap-4 p-4">
-                    <div><span className="chip mb-2">Akce</span><h3 className="font-semibold">{discountOffer.title}</h3><p className="text-sm text-muted">{discountOffer.description}</p></div>
+                    <div><span className="chip mb-2">{t("promo")}</span><h3 className="font-semibold">{discountOffer.title}</h3><p className="text-sm text-muted">{discountOffer.description}</p></div>
                     <button className="btn-ghost" onClick={() => subscribe("vip", discountOffer.price, "VIP (akce)")}>{discountOffer.price} €</button>
                   </div>
                 )}
@@ -127,17 +135,17 @@ export default function Profile({ handle }: { handle: string }) {
             {tab === "custom" && (
               <div className="mt-6 space-y-4">
                 <form className="card space-y-3 p-5" onSubmit={(e) => { e.preventDefault(); submitRequest(); }}>
-                  <h3 className="font-display text-2xl">Set na přání</h3>
-                  <p className="text-sm text-muted">Popiš téma a styl. Studio {p.creatorStudio} požadavek posoudí, vygeneruje set a doručí ho do zpráv. Platíš 50 % předem, zbytek při doručení. Odmítnutý požadavek = vrácená záloha.</p>
-                  <input className="input" placeholder="Téma (např. podzimní procházka v parku)" value={req.topic} onChange={(e) => setReq({ ...req, topic: e.target.value })} />
-                  <input className="input" placeholder="Styl, barvy, nálada" value={req.style} onChange={(e) => setReq({ ...req, style: e.target.value })} />
+                  <h3 className="font-display text-2xl">{t("custom.title")}</h3>
+                  <p className="text-sm text-muted">{t("custom.desc", { studio: p.creatorStudio })}</p>
+                  <input className="input" placeholder={t("custom.topic")} value={req.topic} onChange={(e) => setReq({ ...req, topic: e.target.value })} />
+                  <input className="input" placeholder={t("custom.style")} value={req.style} onChange={(e) => setReq({ ...req, style: e.target.value })} />
                   <select className="input" value={req.size} onChange={(e) => setReq({ ...req, size: e.target.value })}>
-                    <option value="45">Malý set · 5 fotek · 45 €</option>
-                    <option value="75">Velký set · 12 fotek · 75 €</option>
-                    <option value="120">Set + krátké video · 120 €</option>
+                    <option value="45">{t("custom.s1")}</option>
+                    <option value="75">{t("custom.s2")}</option>
+                    <option value="120">{t("custom.s3")}</option>
                   </select>
-                  <button className="btn-primary w-full" disabled={!req.topic.trim()}>Odeslat a zaplatit zálohu {Math.round(Number(req.size) / 2)} €</button>
-                  <p className="text-[11px] text-muted">Požadavky se kontrolují podle pravidel platformy (žádné reálné osoby, nic explicitního mimo pravidla).</p>
+                  <button className="btn-primary w-full" disabled={!req.topic.trim()}>{t("custom.submit", { p: Math.round(Number(req.size) / 2) })}</button>
+                  <p className="text-[11px] text-muted">{t("custom.rules")}</p>
                 </form>
                 {myRequests.length > 0 && (
                   <div className="card divide-y divide-line">
@@ -145,9 +153,9 @@ export default function Profile({ handle }: { handle: string }) {
                       <div key={r.id} className="flex items-center justify-between gap-3 p-4 text-sm">
                         <div className="min-w-0">
                           <p className="truncate font-medium">{r.topic}</p>
-                          <p className="text-xs text-muted">{r.price} € · záloha {r.deposit} € · {new Date(r.createdAt).toLocaleDateString("cs-CZ")}</p>
+                          <p className="text-xs text-muted">{r.price} € · {t("custom.deposit", { p: r.deposit })} · {new Date(r.createdAt).toLocaleDateString(lang)}</p>
                         </div>
-                        <span className={`chip shrink-0 ${r.status === "delivered" ? "border-ok/40 text-ok" : r.status === "declined" ? "text-rose" : "text-gold"}`}>{statusLabel[r.status]}</span>
+                        <span className={`chip shrink-0 ${r.status === "delivered" ? "border-ok/40 text-ok" : r.status === "declined" ? "text-rose" : "text-gold"}`}>{t(`custom.${r.status}`)}</span>
                       </div>
                     ))}
                   </div>
@@ -157,23 +165,24 @@ export default function Profile({ handle }: { handle: string }) {
           </div>
 
           <aside id="tiers" className="space-y-3 lg:sticky lg:top-24 lg:self-start">
-            {p.tiers.map((t) => (
-              <div key={t.id} className={`card p-5 ${current === t.id ? "border-gold" : ""}`}>
+            {p.tiers.map((tier) => (
+              <div key={tier.id} className={`card p-5 ${current === tier.id ? "border-gold" : ""}`}>
                 <div className="flex items-baseline justify-between">
-                  <h3 className="font-display text-2xl">{t.name}</h3>
-                  <p><b className="text-xl text-gold">{t.price} €</b><span className="text-xs text-muted">/měs</span></p>
+                  <h3 className="font-display text-2xl">{tier.name}</h3>
+                  <p><b className="text-xl text-gold">{tier.price} €</b><span className="text-xs text-muted">{t("perMonth")}</span></p>
                 </div>
                 <ul className="mt-3 space-y-1 text-sm text-muted">
-                  {t.perks.map((x) => <li key={x}>· {x}</li>)}
-                  {t.id === "vip" && <li>· Hlasové zprávy od persony</li>}
+                  {tier.perks.map((x) => <li key={x}>· {x}</li>)}
+                  {tier.id === "vip" && <li>· {t("profile.voice")}</li>}
                 </ul>
-                {current === t.id ? <p className="mt-4 text-center text-sm text-ok">Aktivní předplatné</p> : (
-                  <button className="btn-ghost mt-4 w-full" onClick={() => subscribe(t.id, t.price, t.name)}>{current ? "Přejít na tuto úroveň" : "Předplatit"}</button>
+                {current === tier.id ? <p className="mt-4 text-center text-sm text-ok">{t("profile.active")}</p> : (
+                  <button className="btn-ghost mt-4 w-full" onClick={() => subscribe(tier.id, tier.price, tier.name)}>{current ? t("profile.switch") : t("profile.subscribe")}</button>
                 )}
               </div>
             ))}
             <TipGoal personaId={p.id} />
-            <p className="px-1 text-xs text-muted">Chat i obsah generuje AI v charakteru persony, kterou vytvořilo studio {p.creatorStudio}.</p>
+            <p className="px-1 text-xs text-muted">{t("profile.note", { studio: p.creatorStudio })}</p>
+            <ReportButton target="persona" targetId={p.id} personaId={p.id} excerpt={p.name} label={`⚑ ${t("profile.report")}`} className="px-1" />
           </aside>
         </div>
       </div>

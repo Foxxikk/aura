@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import ModerationQueue from "@/components/ModerationQueue";
+import PushSender from "@/components/PushSender";
 import type { Application } from "@/lib/data";
 import { useStore } from "@/lib/store";
 
@@ -13,9 +15,11 @@ const statusLabel: Record<Application["status"], string> = {
 };
 
 export default function Admin() {
-  const { applications: localApps, set, ready, dbEnabled, user } = useStore();
+  const { applications: localApps, set, ready, dbEnabled, user, reports } = useStore();
+  const openReports = reports.filter((r) => r.status === "open").length;
   const [filter, setFilter] = useState<Application["status"] | "all">("pending");
   const [remote, setRemote] = useState<Application[] | null>(null);
+  const [section, setSection] = useState<"apps" | "moderation" | "push">("apps");
   const live = dbEnabled && user?.role === "admin";
 
   const load = useCallback(async () => {
@@ -68,18 +72,27 @@ export default function Admin() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-wider text-muted">Administrace</p>
-          <h1 className="font-display text-5xl">Schvalování tvůrců</h1>
+          <h1 className="font-display text-5xl">{section === "apps" ? "Schvalování tvůrců" : section === "moderation" ? "Moderace" : "Notifikace"}</h1>
         </div>
-        <div className="flex gap-2">
+        {section === "apps" && <div className="flex flex-wrap gap-2">
           {(["pending", "approved", "rejected", "suspended", "all"] as const).map((s) => (
             <button key={s} onClick={() => setFilter(s)} className={`chip ${filter === s ? "border-gold text-gold" : ""}`}>
               {s === "all" ? "Vše" : `${statusLabel[s]} (${counts(s)})`}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
 
-      <div className="mt-6 space-y-3">
+      <div className="mt-4 flex gap-2 border-b border-line">
+        {([["apps", "Žádosti tvůrců"], ["moderation", `Moderace${openReports ? ` (${openReports})` : ""}`], ["push", "Notifikace"]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setSection(k)} className={`-mb-px border-b-2 px-4 py-2 text-sm ${section === k ? "border-gold" : "border-transparent text-muted"}`}>{l}</button>
+        ))}
+      </div>
+
+      {section === "moderation" && <div className="mt-6"><ModerationQueue live={live} /></div>}
+      {section === "push" && <div className="mt-6"><PushSender live={live} /></div>}
+
+      {section === "apps" && <div className="mt-6 space-y-3">
         {!list.length && <p className="text-muted">Žádné žádosti v tomto stavu.</p>}
         {list.map((a) => (
           <div key={a.id} className="card p-5">
@@ -117,8 +130,8 @@ export default function Admin() {
             )}
           </div>
         ))}
-      </div>
-      <p className="mt-6 text-xs text-muted">{live ? "Žádosti se načítají z databáze; každé rozhodnutí se ukládá s e-mailem administrátora." : "Demo režim: žádosti jsou uložené jen v tomto prohlížeči. Po připojení databáze je admin chráněn přihlášením."}</p>
+      </div>}
+      {section === "apps" && <p className="mt-6 text-xs text-muted">{live ? "Žádosti se načítají z databáze; každé rozhodnutí se ukládá s e-mailem administrátora." : "Demo režim: žádosti jsou uložené jen v tomto prohlížeči. Po připojení databáze je admin chráněn přihlášením."}</p>}
     </div>
   );
 }

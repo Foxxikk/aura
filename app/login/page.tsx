@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 
 export default function Login() {
-  const { user, dbEnabled, refreshUser, ready } = useStore();
+  const { user, dbEnabled, refreshUser, ready, referralCode, referredBy } = useStore();
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -20,7 +20,7 @@ export default function Login() {
     const r = await fetch(`/api/auth/${mode}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password, ageConfirmed: age }),
+      body: JSON.stringify({ email, password, ageConfirmed: age, referralCode, referredBy }),
     });
     const j = await r.json().catch(() => ({}));
     setBusy(false);

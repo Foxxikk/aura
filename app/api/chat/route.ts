@@ -1,14 +1,18 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { personaById } from "@/lib/data";
 import { localHour, localTime, isAwake } from "@/lib/realism";
+import { checkText } from "@/lib/moderation";
 
 type Msg = { from: "fan" | "persona" | "system"; text: string };
 type Memory = { name?: string; facts?: string[] };
-type Mode = "reply" | "proactive" | "voice";
+type Mode = "reply" | "proactive" | "voice" | "group";
+type Lang = "cs" | "en" | "de";
+const langName: Record<Lang, string> = { cs: "česky", en: "anglicky (English)", de: "německy (Deutsch)" };
 type Offers = { ppv?: { id: string; title: string; price: number }[]; bundles?: { id: string; title: string; price: number }[] };
 
 export async function POST(req: Request) {
-  const body = (await req.json()) as { personaId: string; history: Msg[]; memory?: Memory; offers?: Offers; mode?: Mode; tier?: string };
+  const body = (await req.json()) as { personaId: string; history: Msg[]; memory?: Memory; offers?: Offers; mode?: Mode; tier?: string; lang?: Lang };
+  const lang: Lang = body.lang === "en" || body.lang === "de" ? body.lang : "cs";
   const persona = personaById(body.personaId);
   if (!persona) return Response.json({ error: "Persona nenalezena" }, { status: 404 });
   const mode: Mode = body.mode ?? "reply";
@@ -18,7 +22,7 @@ export async function POST(req: Request) {
   const lastFan = [...history].reverse().find((m) => m.from === "fan")?.text ?? "";
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    return Response.json(scripted(persona.name, persona.timezone, lastFan, memory, offers, mode));
+    return Response.json(localize(scripted(persona.name, persona.timezone, lastFan, memory, offers, mode), lang, persona.name));
   }
 
   const hour = localHour(persona.timezone);
@@ -31,7 +35,9 @@ export async function POST(req: Request) {
   const task =
     mode === "proactive"
       ? "Fanoušek se dlouho neozval. Napiš mu sama krátkou, přirozenou zprávu (1–2 zprávy), navaž na to, co o něm víš, nebo na to, co právě děláš podle denní doby. Nic neprodávej."
-      : mode === "voice"
+      : mode === "group"
+        ? "Jsi v živém skupinovém chatu s mnoha fanoušky. Odpověz krátce (1–2 věty) na otázku jednoho z nich, oslov ho jménem z otázky, pokud ho zná. Nic neprodávej a nesdílej osobní údaje o fanoušcích."
+        : mode === "voice"
         ? "Fanoušek chce hlasovou zprávu. Napiš text, který řekneš nahlas: 1 souvislá zpráva, max 3 věty, mluvená čeština, bez emoji."
         : "Odpověz na poslední zprávu fanouška.";
 
@@ -47,7 +53,7 @@ Co víš o fanouškovi: ${memLines || "zatím nic"}.
 Úkol: ${task}
 
 Pravidla:
-- Piš česky, krátce, jako zprávy v chatu. Více zpráv odděl prázdným řádkem (max 3).
+- Piš ${langName[lang]}, krátce, jako zprávy v chatu. Více zpráv odděl prázdným řádkem (max 3).
 - Buď v charakteru, přirozená, se zájmem o fanouška. Ptej se a navazuj na to, co víš. Oslovuj jménem, pokud ho znáš.
 - Nikdy netvrď, že jsi skutečný člověk. Na otázku, jestli jsi AI, odpověz pravdivě a vlídně.
 - Nedomlouvej osobní setkání, nežádej kontakty mimo platformu, nevymýšlej slevy ani obsah, který není v nabídce.
@@ -86,6 +92,7 @@ Pravidla:
     let text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
     const parsed = parseTags(text);
     text = parsed.text;
+    if (!checkText(text).ok) text = lang === "en" ? "let's talk about something else 🙂" : lang === "de" ? "lass uns über etwas anderes reden 🙂" : "pojďme se bavit o něčem jiném 🙂";
     return Response.json({
       replies: mode === "voice" ? [text.replace(/\n+/g, " ")] : splitReplies(text),
       offer: parsed.offer === "ppv" && offers.ppv?.[0] ? { type: "ppv", id: offers.ppv[0].id } : parsed.offer === "bundle" && offers.bundles?.[0] ? { type: "bundle", id: offers.bundles[0].id } : undefined,
@@ -95,8 +102,19 @@ Pravidla:
     });
   } catch (e) {
     console.error(e);
-    return Response.json(scripted(persona.name, persona.timezone, lastFan, memory, offers, mode));
+    return Response.json(localize(scripted(persona.name, persona.timezone, lastFan, memory, offers, mode), lang, persona.name));
   }
+}
+
+/** Bez LLM: skriptované odpovědi jsou česky; pro EN/DE použijeme jednoduché obecné odpovědi. */
+function localize<T extends { replies: string[] }>(r: T, lang: Lang, name: string): T {
+  if (lang === "cs") return r;
+  const first = name.split(" ")[0];
+  const pool = lang === "en"
+    ? ["hey 🙂 nice to hear from you", "that sounds great, tell me more", `I'm ${first}, an AI persona – but I love chatting with you`, "what are you up to today?"]
+    : ["hey 🙂 schön, von dir zu hören", "klingt toll, erzähl mehr", `ich bin ${first}, eine KI-Persona – aber ich plaudere gern mit dir`, "was machst du heute?"];
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  return { ...r, replies: r.replies.slice(0, 2).map((_, i) => shuffled[i]) };
 }
 
 function parseTags(raw: string) {
@@ -139,6 +157,10 @@ function scripted(name: string, tz: string, fan: string, memory: Memory, offers:
         : [pick([`dobrý večer${fanName}`, `večer${fanName}, už máš klid?`]), pick(["jaký byl den?", "dneska jsem fotila, pak ti ukážu"])];
     if (memory.facts?.length) replies.push(`mimochodem, jak to dopadlo s tím – ${memory.facts[memory.facts.length - 1].replace(/^[^:]+:\s*/, "")}?`);
     return { replies: replies.slice(0, 2), source: "scripted" };
+  }
+
+  if (mode === "group") {
+    return { replies: [pick(["dobrá otázka! upřímně… asi ano 😄", "haha, to vám řeknu příště", "tohle mě baví – určitě o tom udělám set", "díky, že jste tu se mnou!"])], source: "scripted" };
   }
 
   if (mode === "voice") {
