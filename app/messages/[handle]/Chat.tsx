@@ -21,7 +21,7 @@ export default function Chat({ handle }: { handle: string }) {
   const [text, setText] = useState("");
   const [now, setNow] = useState(Date.now());
   const [showMem, setShowMem] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 500);
@@ -29,8 +29,9 @@ export default function Chat({ handle }: { handle: string }) {
   }, []);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [msgs.length]);
+    const el = listRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [msgs.length, scheduled.length]);
 
   // odpověď na story přichází v #reply=…
   useEffect(() => {
@@ -195,7 +196,7 @@ export default function Chat({ handle }: { handle: string }) {
 
         {showMem && <div className="border-b border-line p-4 lg:hidden"><MemoryPanel mem={mem} name={p.name} forget={forget} /></div>}
 
-        <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
+        <div ref={listRef} className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
           {msgs.map((m, i) => {
             if (m.from === "system")
               return <p key={m.id} className="mx-auto max-w-sm rounded-xl bg-surface-2 px-3 py-2 text-center text-xs text-muted">{m.text}</p>;
@@ -259,7 +260,6 @@ export default function Chat({ handle }: { handle: string }) {
               <span className="h-1.5 w-1.5 rounded-full bg-muted" />
             </div>
           )}
-          <div ref={endRef} />
         </div>
 
         <div className="border-t border-line p-3">
@@ -276,7 +276,7 @@ export default function Chat({ handle }: { handle: string }) {
             </button>
           </div>
           <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2">
-            <input className="input" placeholder={`Napiš ${p.name.split(" ")[0]}…`} value={text} onChange={(e) => setText(e.target.value)} />
+            <input className="input" placeholder="Napiš zprávu…" value={text} onChange={(e) => setText(e.target.value)} />
             <button className="btn-primary" disabled={!text.trim()}>Odeslat</button>
           </form>
           <label className="mt-2 flex cursor-pointer items-center gap-2 text-[11px] text-muted" title="Pro demo zkrátí čekání na odpověď i proaktivní zprávy">

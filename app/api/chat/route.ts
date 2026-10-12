@@ -127,7 +127,7 @@ function scripted(name: string, tz: string, fan: string, memory: Memory, offers:
   const nameMatch = fan.match(/(?:jmenuju se|jsem|říkej mi)\s+([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+)/);
   if (nameMatch) memName = nameMatch[1];
   const likeMatch = fan.match(/(?:baví mě|mám rád|mám ráda|miluju)\s+([^.,!?]+)/i);
-  if (likeMatch) facts.push(`Baví ho/ji: ${likeMatch[1].trim()}`);
+  if (likeMatch) facts.push(`Záliba: ${likeMatch[1].trim()}`);
   const workMatch = fan.match(/(?:pracuju jako|dělám)\s+([^.,!?]+)/i);
   if (workMatch) facts.push(`Práce: ${workMatch[1].trim()}`);
 
