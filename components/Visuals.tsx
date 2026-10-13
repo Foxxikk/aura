@@ -1,7 +1,22 @@
 import type { Persona } from "@/lib/data";
 
+/**
+ * Testovací fotky: skutečné fotografie z Lorem Picsum (licence Unsplash), stabilní podle seed.
+ * Zobrazují místa a scény, ne konkrétní osoby. V produkci se nahradí AI obsahem tvůrce z úložiště (podepsané URL).
+ */
+export function photo(seed: string, w = 800, h = 1000) {
+  return `https://picsum.photos/seed/aura-${encodeURIComponent(seed)}/${w}/${h}`;
+}
+
 /** Abstraktní „portrét“ – v produkci nahradí skutečné AI fotky persony. */
 export function Avatar({ p, size = 48, ring = false }: { p: Persona; size?: number; ring?: boolean }) {
+  if (p.portrait) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={p.portrait} alt={p.name} width={size} height={size} loading="lazy"
+        className={`shrink-0 rounded-full object-cover ${ring ? "ring-2 ring-gold ring-offset-2 ring-offset-bg" : ""}`} style={{ width: size, height: size }} />
+    );
+  }
   return (
     <div
       className={`relative shrink-0 overflow-hidden rounded-full ${ring ? "ring-2 ring-gold ring-offset-2 ring-offset-bg" : ""}`}
@@ -25,6 +40,16 @@ export function Avatar({ p, size = 48, ring = false }: { p: Persona; size?: numb
 
 export function Cover({ p, className = "" }: { p: Persona; className?: string }) {
   return (
+    <div className={`relative overflow-hidden bg-surface-2 ${className}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={photo(`cover-${p.id}`, 1600, 600)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+      <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 40%, rgba(13,10,12,.85)), linear-gradient(120deg, hsl(${p.hue} 60% 30% / .35), transparent 60%)` }} />
+    </div>
+  );
+}
+
+export function CoverGradient({ p, className = "" }: { p: Persona; className?: string }) {
+  return (
     <div
       className={`grain relative overflow-hidden ${className}`}
       style={{
@@ -40,7 +65,16 @@ export function Cover({ p, className = "" }: { p: Persona; className?: string })
   );
 }
 
-export function MediaTile({ hue, locked, className = "" }: { hue: number; locked?: boolean; className?: string }) {
+export function MediaTile({ hue, locked, className = "", seed }: { hue: number; locked?: boolean; className?: string; seed?: string }) {
+  if (seed) {
+    return (
+      <div className={`overflow-hidden bg-surface-2 ${className.includes("absolute") ? "" : "relative"} ${className}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photo(seed, locked ? 80 : 800, locked ? 100 : 1000)} alt="" loading="lazy" draggable={false}
+          className={`absolute inset-0 h-full w-full object-cover ${locked ? "scale-125 blur-2xl brightness-75" : ""}`} />
+      </div>
+    );
+  }
   return (
     <div className={`grain overflow-hidden ${className.includes("absolute") ? "" : "relative"} ${className}`}>
       <div

@@ -27,7 +27,7 @@ export default function PostCard({ post, persona, reason }: { post: Post; person
   return (
     <article className="card overflow-hidden">
       <div className="relative aspect-[4/5]">
-        <MediaTile hue={post.hue} locked={!open} className="absolute inset-0" />
+        <MediaTile hue={post.hue} seed={post.id} locked={!open} className="absolute inset-0" />
         <div className="absolute left-3 top-3 flex gap-1.5">
           {post.kind !== "photo" && (
             <span className="chip border-white/20 bg-black/40 text-white">{post.kind === "set" ? t("post.set", { n: post.count ?? 0 }) : t("post.video")}</span>

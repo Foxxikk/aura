@@ -110,7 +110,7 @@ export default function Profile({ handle }: { handle: string }) {
                   return (
                     <div key={b.id} className="card flex flex-wrap items-center gap-4 p-4">
                       <div className="grid w-40 grid-cols-3 gap-1">
-                        {b.postIds.slice(0, 3).map((id) => <MediaTile key={id} hue={posts.find((x) => x.id === id)?.hue ?? 0} locked={!unlocked.includes(id)} className="aspect-square rounded-md" />)}
+                        {b.postIds.slice(0, 3).map((id) => <MediaTile key={id} seed={id} hue={posts.find((x) => x.id === id)?.hue ?? 0} locked={!unlocked.includes(id)} className="aspect-square rounded-md" />)}
                       </div>
                       <div className="min-w-0 flex-1">
                         <h3 className="font-semibold">{b.title}</h3>

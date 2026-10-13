@@ -225,7 +225,7 @@ export default function Chat({ handle }: { handle: string }) {
                   {m.text && <div className="max-w-[78%] rounded-2xl rounded-bl-md bg-surface-2 px-4 py-2 text-sm">{m.text}</div>}
                   <div className="w-60 overflow-hidden rounded-2xl rounded-bl-md border border-line bg-surface-2">
                     <div className="relative aspect-square">
-                      <MediaTile hue={post?.hue ?? 0} locked={!open} className="absolute inset-0" />
+                      <MediaTile hue={post?.hue ?? 0} seed={post?.id} locked={!open} className="absolute inset-0" />
                       {!open && (
                         <div className="absolute inset-0 flex items-center justify-center">
                           <button className="btn-primary" onClick={() => unlockPpv(m)}>🔒 {price} €</button>
@@ -247,7 +247,7 @@ export default function Chat({ handle }: { handle: string }) {
                     <div className="grid grid-cols-3 gap-1">
                       {(b?.postIds ?? []).slice(0, 3).map((id) => {
                         const post = posts.find((x) => x.id === id);
-                        return <MediaTile key={id} hue={post?.hue ?? 0} locked={!unlocked.includes(id)} className="aspect-square rounded-md" />;
+                        return <MediaTile key={id} seed={id} hue={post?.hue ?? 0} locked={!unlocked.includes(id)} className="aspect-square rounded-md" />;
                       })}
                     </div>
                     <p className="mt-2 text-sm font-semibold">{m.bundle.title}</p>

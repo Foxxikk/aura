@@ -43,6 +43,8 @@ export type Persona = {
   schedule: { wake: number; sleep: number };
   creatorStudio: string;
   isNew?: boolean;
+  /** AI generovaný portrét (cesta v /public/personas). Bez něj abstraktní avatar. */
+  portrait?: string;
 };
 
 export const personas: Persona[] = [

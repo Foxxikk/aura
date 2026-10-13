@@ -389,7 +389,7 @@ function Vault() {
           return (
             <button key={x.id} onClick={() => setSel(on ? sel.filter((i) => i !== x.id) : [...sel, x.id])} className={`card overflow-hidden text-left transition ${on ? "border-gold ring-2 ring-gold/40" : ""}`}>
               <div className="relative">
-                <MediaTile hue={x.hue} className="aspect-square" />
+                <MediaTile hue={x.hue} seed={x.id} className="aspect-square" />
                 {on && <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-gold text-xs text-[#1a0f12]">✓</span>}
               </div>
               <div className="p-2 text-xs">
