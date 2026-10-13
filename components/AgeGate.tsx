@@ -1,12 +1,14 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { useT } from "@/lib/i18n";
 
 export default function AgeGate() {
   const { ready, ageVerified, set } = useStore();
   const t = useT();
-  if (!ready || ageVerified) return null;
+  const path = usePathname();
+  if (!ready || ageVerified || path === "/pin") return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
       <div className="card max-w-md p-8 text-center">
