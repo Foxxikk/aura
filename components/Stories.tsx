@@ -96,7 +96,7 @@ export function StoryViewer({ personaId, onClose, onNextPersona }: { personaId: 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-0 sm:p-6" onClick={onClose}>
       <div className="relative h-full w-full max-w-sm overflow-hidden sm:h-[85vh] sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
-        <MediaTile hue={story.hue} seed={story.id} locked={locked} className="absolute inset-0" />
+        <MediaTile hue={story.hue} seed={`${story.personaId}-post-${(Number(story.id.split("-s")[1]) * 2 + 1) % 6}`} locked={locked} className="absolute inset-0" />
         <div className="absolute inset-x-0 top-0 z-10 space-y-3 bg-gradient-to-b from-black/60 to-transparent p-4">
           <div className="flex gap-1">
             {list.map((s, j) => (

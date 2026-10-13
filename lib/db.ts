@@ -37,8 +37,6 @@ export function ensureSchema() {
       await sql`CREATE TABLE IF NOT EXISTS gifts (
         code TEXT PRIMARY KEY, data JSONB NOT NULL, buyer TEXT, redeemed_by TEXT, redeemed_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now())`;
-      await sql`CREATE TABLE IF NOT EXISTS media (
-        key TEXT PRIMARY KEY, mime TEXT NOT NULL, data BYTEA NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now())`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT`;
       const [{ count }] = (await sql`SELECT count(*)::int AS count FROM applications`) as { count: number }[];
